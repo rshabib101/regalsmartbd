@@ -392,6 +392,7 @@ $brands = Brand::where('status', 1)
         Toastr::success('Product added to cart successfully', 'Success!');
 
         // Facebook CAPI AddToCart (server-side)
+        $atc_event_id = $request->input('event_id') ?: ('atc_' . $product->id . '_' . time());
         try {
             $capiUserData = [
                 'client_ip_address' => $request->ip(),
@@ -407,7 +408,7 @@ $brands = Brand::where('status', 1)
                 'currency'      => 'BDT',
                 'num_items'     => $requestedQty,
             ], $capiUserData, [
-                'event_id'        => 'atc_' . $product->id . '_' . time(),
+                'event_id'        => $atc_event_id,
                 'event_source_url' => $request->fullUrl(),
             ]);
         } catch (\Throwable $e) {
@@ -417,7 +418,7 @@ $brands = Brand::where('status', 1)
         // AJAX/JSON: order_now হলে redirect URL JSON এ পাঠাতে হবে — নইলে ক্লায়েন্ট HTML/302 পেয়ে
         // data.success না মেনে ফর্ম আবার সাবমিট করে কার্টে ডাবল যোগ হয়।
         if ($request->ajax() || $request->wantsJson()) {
-            $payload = ['success' => true, 'id' => $product->id];
+            $payload = ['success' => true, 'id' => $product->id, 'event_id' => $atc_event_id];
             if ($request->has('order_now')) {
                 $payload['redirect'] = route('customer.checkout');
             }
@@ -988,6 +989,7 @@ $brands = Brand::where('status', 1)
         }
         $products = $products->paginate(36);
         $keyword = $request->keyword ?? '';
+        $search_event_id = 'search_' . time();
 
         // Facebook CAPI Search (server-side)
         if (!empty($keyword)) {
@@ -1001,7 +1003,7 @@ $brands = Brand::where('status', 1)
                 app(\App\Services\FacebookCapiService::class)->sendSearch([
                     'search_string' => $keyword,
                 ], $capiUserData, [
-                    'event_id'        => 'search_' . time(),
+                    'event_id'        => $search_event_id,
                     'event_source_url' => request()->fullUrl(),
                 ]);
             } catch (\Throwable $e) {
@@ -1009,7 +1011,7 @@ $brands = Brand::where('status', 1)
             }
         }
 
-        return view('frontEnd.layouts.pages.search', compact('products', 'keyword'));
+        return view('frontEnd.layouts.pages.search', compact('products', 'keyword', 'search_event_id'));
     }
 
     public function shipping_charge(Request $request)

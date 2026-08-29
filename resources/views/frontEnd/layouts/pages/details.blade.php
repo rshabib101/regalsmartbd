@@ -5,35 +5,62 @@
 @endphp
 @push('dataLayer')
 window.dataLayer = window.dataLayer || [];
+window.dataLayer.push({ ecommerce: null });
 window.dataLayer.push({
     event: 'view_item',
     ecommerce: {
         currency: 'BDT',
-        value: {{ $details->new_price ?? 0 }},
+        value: {{ (float) ($details->new_price ?? 0) }},
         items: [{
             item_id: '{{ $details->id }}',
-            item_name: '{{ addslashes($details->name) }}',
-            price: {{ $details->new_price ?? 0 }},
-            item_category: '{{ addslashes(optional($details->category)->name ?? '') }}',
+            item_name: @json($details->name),
+            price: {{ (float) ($details->new_price ?? 0) }},
+            item_brand: @json(optional($details->brand)->name ?? ''),
+            item_category: @json(optional($details->category)->name ?? ''),
+            item_variant: @json($details->pro_unit ?? ''),
             quantity: 1
         }]
     }
 });
+
+@if(isset($products) && $products->count() > 0)
+window.dataLayer.push({
+    event: 'view_item_list',
+    ecommerce: {
+        item_list_name: 'Related Products',
+        currency: 'BDT',
+        items: [
+            @foreach($products as $rp)
+            {
+                item_id: '{{ $rp->id }}',
+                item_name: @json($rp->name),
+                price: {{ (float) ($rp->new_price ?? 0) }},
+                item_brand: @json(optional($rp->brand)->name ?? ''),
+                item_category: @json(optional($rp->category)->name ?? ''),
+                index: {{ $loop->iteration }}
+            }@if(!$loop->last),@endif
+            @endforeach
+        ]
+    }
+});
+@endif
+
 if (typeof fbq === 'function') {
     fbq('track', 'ViewContent', {
         content_ids: ['{{ $details->id }}'],
-        content_name: '{{ addslashes($details->name) }}',
+        content_name: @json($details->name),
+        content_category: @json(optional($details->category)->name ?? ''),
         content_type: 'product',
-        value: {{ $details->new_price ?? 0 }},
+        value: {{ (float) ($details->new_price ?? 0) }},
         currency: 'BDT'
-    }, { eventID: '{{ $vc_event_id ?? "vc_prod_".$details->id."_".time() }}' });
+    }, { eventID: '{{ $vc_event_id ?? ("vc_prod_".$details->id."_".time()) }}' });
 }
 if (typeof ttq !== 'undefined') {
     ttq.track('ViewContent', {
         content_type: 'product',
         content_id: '{{ $details->id }}',
-        content_name: '{{ addslashes($details->name) }}',
-        value: {{ $details->new_price ?? 0 }},
+        content_name: @json($details->name),
+        value: {{ (float) ($details->new_price ?? 0) }},
         currency: 'BDT'
     });
 }
@@ -962,236 +989,7 @@ if (typeof ttq !== 'undefined') {
         });
     });
 </script>
-<!--Data Layer Start-->
-<script type="text/javascript">
-    window.dataLayer = window.dataLayer || [];
-    dataLayer.push({
-        ecommerce: null
-    });
-    dataLayer.push({
-        event: "view_item",
-        ecommerce: {
-            items: [{
-                item_name: "{{ $details->name }}",
-                item_id: "{{ $details->id }}",
-                price: "{{ $details->new_price }}",
-                item_brand: "{{ $details->brand?$details->brand->name:'' }}",
-                item_category: "{{ $details->category->name }}",
-                item_variant: "{{ $details->pro_unit }}",
-                currency: "BDT",
-                quantity: {{ $details->stock ?? 0 }}
-            }],
-            impression: [
-                @foreach ($products as $value)
-                    {
-                        item_name: "{{ $value->name }}",
-                        item_id: "{{ $value->id }}",
-                        price: "{{ $value->new_price }}",
-                        item_brand: "{{ $details->brand?$details->brand->name:'' }}",
-                        item_category: "{{ $value->category ? $value->category->name : '' }}",
-                        item_variant: "{{ $value->pro_unit }}",
-                        currency: "BDT",
-                        quantity: {{ $value->stock ?? 0 }}
-                    },
-                @endforeach
-            ]
-        }
-    });
-</script>
-<script type="text/javascript">
-    $(document).ready(function() {
-        $('#add_to_cart').click(function() {
-            gtag("event", "add_to_cart", {
-                currency: "BDT",
-                value: "1.5",
-                items: [
-                    @foreach (Cart::instance('shopping')->content() as $cartInfo)
-                        {
-                            item_id: "{{$details->id}}",
-                            item_name: "{{$details->name}}",
-                            price: "{{$details->new_price}}",
-                            currency: "BDT",
-                            quantity: {{ $cartInfo->qty ?? 0 }}
-                        },
-                    @endforeach
-                ]
-            });
-        });
-    });
-</script>
-<script type="text/javascript">
-    $(document).ready(function() {
-        $('#order_now').click(function() {
-            gtag("event", "add_to_cart", {
-                currency: "BDT",
-                value: "1.5",
-                items: [
-                    @foreach (Cart::instance('shopping')->content() as $cartInfo)
-                        {
-                            item_id: "{{$details->id}}",
-                            item_name: "{{$details->name}}",
-                            price: "{{$details->new_price}}",
-                            currency: "BDT",
-                            quantity: {{ $cartInfo->qty ?? 0 }}
-                        },
-                    @endforeach
-                ]
-            });
-        });
-    });
-</script>
 
-<!-- Data Layer End-->
-
-{{-- 🔹 নতুন dataLayer + Facebook Pixel ইভেন্ট (আগের কিছু না কেটে শুধু যোগ করা) --}}
-<script type="text/javascript">
-    window.dataLayer = window.dataLayer || [];
-
-    (function () {
-
-        var productItem = {
-            item_id: "{{ $details->id }}",
-            item_name: @json($details->name),
-            price: {{ (float) $details->new_price }},
-            item_brand: @json(optional($details->brand)->name),
-            item_category: @json(optional($details->category)->name),
-            item_variant: @json($details->pro_unit),
-            currency: "BDT",
-            quantity: {{ $details->stock ?? 0 }}
-        };
-
-        var relatedItems = [
-            @foreach ($products as $value)
-            {
-                item_id: "{{ $value->id }}",
-                item_name: @json($value->name),
-                price: {{ (float) $value->new_price }},
-                item_brand: @json(optional($value->brand)->name),
-                item_category: @json(optional($value->category)->name),
-                item_variant: @json($value->pro_unit),
-                currency: "BDT",
-                quantity: {{ $value->stock ?? 0 }}
-            }@if(!$loop->last),@endif
-            @endforeach
-        ];
-
-        // view_item_list (Related products)
-        if (relatedItems.length) {
-            window.dataLayer.push({
-                event: "view_item_list",
-                ecommerce: {
-                    item_list_name: "Related Products",
-                    currency: "BDT",
-                    items: relatedItems
-                }
-            });
-        }
-
-        // Facebook Pixel: ViewContent
-        if (typeof fbq === "function") {
-            fbq("track", "ViewContent", {
-                content_ids: [productItem.item_id],
-                content_name: productItem.item_name,
-                content_category: productItem.item_category,
-                value: productItem.price,
-                currency: "BDT"
-            });
-        }
-
-        // Helper: qty সহ item তৈরি
-        function buildCurrentItem() {
-            var qtyInput = document.querySelector("input[name='qty']");
-            var qty = parseInt(qtyInput ? qtyInput.value : "1", 10);
-            if (isNaN(qty) || qty < 1) qty = 1;
-
-            return {
-                item_id: productItem.item_id,
-                item_name: productItem.item_name,
-                price: productItem.price,
-                item_brand: productItem.item_brand,
-                item_category: productItem.item_category,
-                item_variant: productItem.item_variant,
-                currency: "BDT",
-                quantity: qty
-            };
-        }
-
-        // "কার্টে যোগ করুন" -> add_to_cart + FB AddToCart
-        $(document).on("click", ".add_cart_btn", function () {
-            var item  = buildCurrentItem();
-            var value = item.price * item.quantity;
-
-            window.dataLayer.push({ ecommerce: null });
-            window.dataLayer.push({
-                event: "add_to_cart",
-                ecommerce: {
-                    currency: "BDT",
-                    value: value,
-                    items: [item]
-                }
-            });
-
-            if (typeof fbq === "function") {
-                fbq("track", "AddToCart", {
-                    content_ids: [item.item_id],
-                    content_name: item.item_name,
-                    value: value,
-                    currency: "BDT",
-                    contents: [
-                        { id: item.item_id, quantity: item.quantity }
-                    ]
-                });
-            }
-        });
-
-        // "অর্ডার করুন" -> add_to_cart + begin_checkout + FB InitiateCheckout
-        $(document).on("click", ".order_now_btn", function () {
-            var item  = buildCurrentItem();
-            var value = item.price * item.quantity;
-
-            // GA4 add_to_cart
-            window.dataLayer.push({ ecommerce: null });
-            window.dataLayer.push({
-                event: "add_to_cart",
-                ecommerce: {
-                    currency: "BDT",
-                    value: value,
-                    items: [item]
-                }
-            });
-
-            // GA4 begin_checkout
-            window.dataLayer.push({
-                event: "begin_checkout",
-                ecommerce: {
-                    currency: "BDT",
-                    value: value,
-                    items: [item]
-                }
-            });
-
-            // FB Pixel
-            if (typeof fbq === "function") {
-                fbq("track", "AddToCart", {
-                    content_ids: [item.item_id],
-                    content_name: item.item_name,
-                    value: value,
-                    currency: "BDT",
-                    contents: [
-                        { id: item.item_id, quantity: item.quantity }
-                    ]
-                });
-
-                fbq("track", "InitiateCheckout", {
-                    value: value,
-                    currency: "BDT",
-                    num_items: item.quantity
-                });
-            }
-        });
-
-    })();
-</script>
 
 <script>
     $(document).ready(function() {
@@ -1335,6 +1133,11 @@ if (typeof ttq !== 'undefined') {
         form.classList.add("cart-ajax-submit");
         var formData = new FormData(form);
         if (isOrderNow) formData.append("order_now", "1");
+        var qtyInput = form.querySelector("input[name='qty']");
+        var qty = parseInt(qtyInput ? qtyInput.value : "1", 10) || 1;
+        var atcEventId = 'atc_' + '{{ $details->id }}' + '_' + Math.floor(Date.now() / 1000);
+        formData.append("event_id", atcEventId);
+
         var xhr = new XMLHttpRequest();
         xhr.open("POST", "{{ route('cart.store') }}");
         xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
@@ -1345,6 +1148,9 @@ if (typeof ttq !== 'undefined') {
             try {
                 var data = JSON.parse(xhr.responseText);
                 if (data && data.success) {
+                    if (typeof fireAddToCartEvent === "function") {
+                        fireAddToCartEvent(null, '{{ $details->id }}', qty, @json($details->name), {{ (float)($details->new_price ?? 0) }}, @json(optional($details->category)->name ?? ''), (data && data.event_id) ? data.event_id : atcEventId);
+                    }
                     if (typeof toastr !== "undefined") toastr.success("কার্টে যোগ হয়েছে!", "সফল");
                     if (typeof cart_count === "function") cart_count();
                     if (typeof mobile_cart === "function") mobile_cart();

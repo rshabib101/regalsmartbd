@@ -25,34 +25,7 @@
         ];
     }, $cartItems);
 @endphp
-@push('dataLayer')
-window.dataLayer = window.dataLayer || [];
-window.dataLayer.push({
-    event: 'begin_checkout',
-    ecommerce: {
-        currency: 'BDT',
-        value: {{ $checkoutValue }},
-        items: @json($cartItems)
-    }
-});
-if (typeof fbq === 'function') {
-    fbq('track', 'InitiateCheckout', {
-        value: {{ $checkoutValue }},
-        currency: 'BDT',
-        num_items: {{ count($cartItems) }},
-        content_ids: @json($contentIds),
-        content_type: 'product'
-    });
-}
-if (typeof ttq !== 'undefined') {
-    ttq.track('InitiateCheckout', {
-        value: {{ $checkoutValue }},
-        currency: 'BDT',
-        contents: @json($tiktokContents),
-        content_type: 'product'
-    });
-}
-@endpush
+
 @push('css')
 <link rel="stylesheet" href="{{ asset('public/frontEnd/css/select2.min.css') }}" />
 <style>
@@ -1068,6 +1041,7 @@ if (typeof ttq !== 'undefined') {
         const grandTotal   = parseFloat("{{ $grand_total }}") || 0;
         const payableNow   = hasAdvance ? advanceAmount : grandTotal;
         const coupon       = @json(Session::get('coupon_code', null));
+        const icoEventId   = "{{ $ico_event_id ?? ('ico_' . time()) }}";
 
         const ga4Items = items.map(function (item, index) {
             return {
@@ -1086,24 +1060,38 @@ if (typeof ttq !== 'undefined') {
                 event: "begin_checkout",
                 ecommerce: {
                     currency: "BDT",
-                    value: payableNow,
+                    value: grandTotal,
                     coupon: coupon,
                     items: ga4Items
                 }
             });
         }
 
-        // Facebook Pixel: InitiateCheckout
+        // Facebook Pixel: InitiateCheckout (deduplicated with CAPI)
         if (typeof fbq === "function" && items.length) {
             fbq("track", "InitiateCheckout", {
-                value: payableNow,
+                value: grandTotal,
                 currency: "BDT",
                 num_items: items.length,
-                content_ids: items.map(function(i){ return i.id; }),
+                content_ids: items.map(function(i){ return String(i.id); }),
                 contents: items.map(function(i){
-                    return {id: i.id, quantity: i.qty, item_price: i.price};
+                    return {id: String(i.id), quantity: i.qty, item_price: i.price};
                 }),
+                content_type: 'product',
                 coupon: coupon || undefined
+            }, { eventID: icoEventId });
+        }
+
+        // TikTok Pixel: InitiateCheckout
+        if (typeof ttq !== "undefined" && items.length) {
+            ttq.track('InitiateCheckout', {
+                value: grandTotal,
+                currency: "BDT",
+                quantity: items.length,
+                content_type: 'product',
+                contents: items.map(function(i){
+                    return { content_id: String(i.id), content_name: i.name, quantity: i.qty, price: i.price };
+                })
             });
         }
 
@@ -1136,7 +1124,7 @@ if (typeof ttq !== 'undefined') {
                         currency: "BDT",
                         payment_method: paymentMethod,
                         num_items: items.length,
-                        content_ids: items.map(function(i){ return i.id; })
+                        content_ids: items.map(function(i){ return String(i.id); })
                     });
                 }
             });

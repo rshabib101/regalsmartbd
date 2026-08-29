@@ -26,14 +26,31 @@
         <link rel="stylesheet" href="{{asset('public/backEnd/')}}/assets/css/toastr.min.css" />
 
         <link rel="stylesheet" href="{{asset('public/frontEnd/css/wsit-menu.css')}}" />
-<link rel="stylesheet" href="{{ url('/style.css') }}?v={{ time() }}">
-<link rel="stylesheet" href="{{ url('/responsive.css') }}?v={{ time() }}">
+        <link rel="stylesheet" href="{{ url('/style.css') }}?v={{ file_exists(public_path('style.css')) ? filemtime(public_path('style.css')) : '1.0' }}">
+        <link rel="stylesheet" href="{{ url('/responsive.css') }}?v={{ file_exists(public_path('responsive.css')) ? filemtime(public_path('responsive.css')) : '1.0' }}">
         <link rel="stylesheet" href="{{asset('public/frontEnd/css/main.css')}}" />
 
         <meta name="facebook-domain-verification" content="{{$generalsetting->facebook_verification}}" />
         <meta name="google-site-verification" content="{{$generalsetting->google_verification}}" />
 
-        {{-- Data Layer - must load first for GTM/GA4/Facebook/TikTok --}}
+        @php
+            $pixels = $pixels ?? collect();
+            $gtm_code = $gtm_code ?? collect();
+            $tiktok_pixels = $tiktok_pixels ?? collect();
+            $authCust = Auth::guard('customer')->user();
+            $fbUserData = [];
+            if ($authCust) {
+                if (!empty($authCust->email)) { $fbUserData['em'] = hash('sha256', strtolower(trim($authCust->email))); }
+                if (!empty($authCust->phone)) {
+                    $p = preg_replace('/[^0-9]/', '', (string)$authCust->phone);
+                    if (str_starts_with($p, '01') && strlen($p) === 11) { $p = '88' . $p; }
+                    $fbUserData['ph'] = hash('sha256', $p);
+                }
+                $fbUserData['external_id'] = hash('sha256', (string)$authCust->id);
+            }
+        @endphp
+
+        {{-- Base Data Layer --}}
         <script>
             window.dataLayer = window.dataLayer || [];
             window.dataLayer.push({
@@ -43,19 +60,8 @@
                 currency: 'BDT',
                 language: 'bn'
             });
-            @stack('dataLayer')
         </script>
-		
-		<style> 
 
-</style> 
-		
-
-        @php
-            $pixels = $pixels ?? collect();
-            $gtm_code = $gtm_code ?? collect();
-            $tiktok_pixels = $tiktok_pixels ?? collect();
-        @endphp
         @foreach($pixels as $pixel)
         <!-- Facebook Pixel Code -->
         <script>
@@ -75,23 +81,13 @@
                 s = b.getElementsByTagName(e)[0];
                 s.parentNode.insertBefore(t, s);
             })(window, document, "script", "https://connect.facebook.net/en_US/fbevents.js");
-            fbq("init", "{{{$pixel->code}}}");
+            fbq("init", "{{{$pixel->code}}}", @json(!empty($fbUserData) ? $fbUserData : (object)[]));
             fbq("track", "PageView");
         </script>
         <noscript>
             <img height="1" width="1" style="display: none;" src="https://www.facebook.com/tr?id={{{$pixel->code}}}&ev=PageView&noscript=1" />
         </noscript>
         <!-- End Facebook Pixel Code -->
-        @endforeach
-        
-        @foreach($gtm_code as $gtm)
-        <!-- Google Tag Manager -->
-        <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-        new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-        })(window,document,'script','dataLayer','{{ str_starts_with($gtm->code, "GTM-") ? $gtm->code : "GTM-".$gtm->code }}');</script>
-        <!-- End Google Tag Manager -->
         @endforeach
 
         @foreach($tiktok_pixels as $tp)
@@ -105,6 +101,23 @@
         </script>
         <!-- End TikTok Pixel -->
         @endforeach
+
+        @foreach($gtm_code as $gtm)
+        <!-- Google Tag Manager -->
+        <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+        new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+        })(window,document,'script','dataLayer','{{ str_starts_with($gtm->code, "GTM-") ? $gtm->code : "GTM-".$gtm->code }}');</script>
+        <!-- End Google Tag Manager -->
+        @endforeach
+
+        {{-- Page-specific dataLayer & Pixel events --}}
+        <script>
+            @stack('dataLayer')
+        </script>
+
+
         <style>
             .whatsapp-float {
                 position: fixed;
@@ -747,9 +760,8 @@
                         
                         <span>Website Designed by:</span>
 
-                        <a href="https://www.creativedesign.com.bd" target="_blank" style="display: inline-flex; align-items: center; text-decoration: none; color: white; margin-left: 5px;">
-                            <img src="{{ asset('public/uploads/creativedesign.png') }}" alt="Creative Design" style="height: 24px; margin-right: 5px;">
-                            <strong>Creative Design</strong>
+                        <a href="https://rshabib101.github.io/habib/" target="_blank" style="display: inline-flex; align-items: center; text-decoration: none; color: white; margin-left: 5px;">
+                            <strong>HABIB TALUKDER</strong>
                         </a>
                     </p>
                 </div>
@@ -1979,13 +1991,25 @@ document.getElementById("chatToggle").addEventListener("click", function() {
                     });
                 });
             }
-            function fireAddToCartEvent(el, id, qty, name, price, category) {
+            function fireAddToCartEvent(el, id, qty, name, price, category, eventId) {
                 qty = parseInt(qty) || 1;
                 price = parseFloat(price) || 0;
+                eventId = eventId || ('atc_' + id + '_' + Math.floor(Date.now() / 1000));
                 var item = { item_id: String(id), item_name: name || '', price: price, quantity: qty, item_category: category || '' };
                 window.dataLayer = window.dataLayer || [];
+                window.dataLayer.push({ ecommerce: null });
                 window.dataLayer.push({ event: 'add_to_cart', ecommerce: { currency: 'BDT', value: price * qty, items: [item] } });
-                if (typeof fbq === 'function') fbq('track', 'AddToCart', { content_ids: [String(id)], content_name: name, content_type: 'product', value: price * qty, currency: 'BDT', num_items: qty });
+                if (typeof fbq === 'function') {
+                    fbq('track', 'AddToCart', {
+                        content_ids: [String(id)],
+                        content_name: name,
+                        content_type: 'product',
+                        value: price * qty,
+                        currency: 'BDT',
+                        num_items: qty,
+                        contents: [{ id: String(id), quantity: qty, item_price: price }]
+                    }, { eventID: eventId });
+                }
                 if (typeof ttq !== 'undefined') ttq.track('AddToCart', { content_type: 'product', content_id: String(id), content_name: name, value: price * qty, currency: 'BDT', quantity: qty });
             }
             $(document).on("click", ".addcartbutton", function (e) {
@@ -1996,15 +2020,17 @@ document.getElementById("chatToggle").addEventListener("click", function() {
                 var name = $btn.data("name") || $btn.closest('.product_item, .wist_item, .search-item').find('.pro_name a, .product-name a').first().text().trim();
                 var price = parseFloat($btn.data("price")) || parseFloat($btn.closest('.product_item, .wist_item, .search-item').find('.pro_price span, .pro_price p, .price').first().text().replace(/[^\d.]/g, '')) || 0;
                 var category = $btn.data("category") || '';
+                var eventId = 'atc_' + id + '_' + Math.floor(Date.now() / 1000);
                 if (id) {
                     $.ajax({
                         cache: "false",
                         type: "GET",
                         url: "{{url('add-to-cart')}}/" + id + "/" + qty,
+                        data: { event_id: eventId },
                         dataType: "json",
                         success: function (data) {
                             if (data) {
-                                fireAddToCartEvent(null, id, qty, name, price, category);
+                                fireAddToCartEvent(null, id, qty, name, price, category, (data && data.event_id) ? data.event_id : eventId);
                                 toastr.success('কার্টে যোগ হয়েছে!', 'সফল');
                                 cart_count();
                                 mobile_cart();
@@ -2034,15 +2060,16 @@ document.getElementById("chatToggle").addEventListener("click", function() {
                 if (!priceText) priceText = $form.closest('.details-action-box, .block__single').find('.details-price, .block__price, .price').first().text() || '';
                 var price = parseFloat(String(priceText).replace(/[^\d.]/g, '')) || 0;
                 var category = $form.closest('.product_item, .wist_item').find('[data-category]').data('category') || '';
+                var eventId = 'atc_' + id + '_' + Math.floor(Date.now() / 1000);
                 $form.addClass('cart-ajax-submit');
                 $.ajax({
                     type: "POST",
-                    data: $form.serialize(),
+                    data: $form.serialize() + '&event_id=' + encodeURIComponent(eventId),
                     url: $form.attr('action'),
                     headers: { 'X-Requested-With': 'XMLHttpRequest' },
                     success: function (data) {
                         if (data && data.success) {
-                            fireAddToCartEvent(null, id, qty, name, price, category);
+                            fireAddToCartEvent(null, id, qty, name, price, category, (data && data.event_id) ? data.event_id : eventId);
                             toastr.success('কার্টে যোগ হয়েছে!', 'সফল');
                             cart_count();
                             mobile_cart();

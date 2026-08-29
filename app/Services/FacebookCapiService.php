@@ -179,9 +179,14 @@ class FacebookCapiService
             }
         }
 
-        // Phone (hashed)
+        // Phone (hashed) - normalize with BD country code (8801...) for high EMQ
         if (isset($userData['phone'])) {
-            $phone = preg_replace('/[^0-9]/', '', $userData['phone']);
+            $phone = preg_replace('/[^0-9]/', '', (string) $userData['phone']);
+            if (str_starts_with($phone, '01') && strlen($phone) === 11) {
+                $phone = '88' . $phone;
+            } elseif (str_starts_with($phone, '8801') && strlen($phone) === 13) {
+                // already in correct 8801... format
+            }
             if (!empty($phone) && strlen($phone) < 64) {
                 $prepared['ph'] = hash('sha256', $phone);
             }
@@ -221,16 +226,15 @@ class FacebookCapiService
 
         // Zip code (hashed)
         if (isset($userData['zip_code'])) {
-            $zipCode = trim($userData['zip_code']);
+            $zipCode = trim(strtolower($userData['zip_code']));
             if (!empty($zipCode) && strlen($zipCode) < 64) {
                 $prepared['zp'] = hash('sha256', $zipCode);
             }
         }
 
-        // Country code (2-letter ISO code)
-        if (isset($userData['country_code'])) {
-            $prepared['country'] = strtoupper($userData['country_code']);
-        }
+        // Country code (hashed 2-letter lowercase ISO code, default 'bd')
+        $country = !empty($userData['country_code']) ? strtolower(trim($userData['country_code'])) : 'bd';
+        $prepared['country'] = hash('sha256', $country);
 
         // External ID (hashed)
         if (isset($userData['external_id'])) {

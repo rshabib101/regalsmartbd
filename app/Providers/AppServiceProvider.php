@@ -155,12 +155,28 @@ class AppServiceProvider extends ServiceProvider
          * 🧠 Global View Share (Optimized with Cache)
          */
         try {
-            // Cache pending reviews count (5 minutes)
-            $pending_reviews = Cache::remember('pending_reviews_count', 300, function () {
-                return Review::where('status', 'pending')->count();
-            });
-            view()->share('pending_reviews', $pending_reviews); 
-            
+            // Admin-only notification counters (only load when admin is logged in or in admin route)
+            if (Auth::guard('admin')->check() || request()->is('admin*')) {
+                $pending_reviews = Cache::remember('pending_reviews_count', 300, function () {
+                    return Review::where('status', 'pending')->count();
+                });
+                view()->share('pending_reviews', $pending_reviews);
+
+                $neworder = Cache::remember('new_order_count', 120, function () {
+                    return Order::where('order_status', 1)->count();
+                });
+                view()->share('neworder', $neworder);
+
+                $pendingorder = Cache::remember('pending_orders_list', 120, function () {
+                    return Order::where('order_status', 1)->latest()->limit(9)->get();
+                });
+                view()->share('pendingorder', $pendingorder);
+            } else {
+                view()->share('pending_reviews', 0);
+                view()->share('neworder', 0);
+                view()->share('pendingorder', collect());
+            }
+
             // Cache general setting (30 minutes)
             $generalsetting = Cache::remember('general_setting', 1800, function () {
                 return GeneralSetting::where('status', 1)->first();
@@ -212,19 +228,7 @@ class AppServiceProvider extends ServiceProvider
                 return Brand::where('status', 1)->get();
             });
             view()->share('brands', $brands);
-            
-            // Cache order count (2 minutes - needs to be fresh)
-            $neworder = Cache::remember('new_order_count', 120, function () {
-                return Order::where('order_status', 1)->count();
-            });
-            view()->share('neworder', $neworder);
-            
-            // Cache pending orders (2 minutes)
-            $pendingorder = Cache::remember('pending_orders_list', 120, function () {
-                return Order::where('order_status', 1)->latest()->limit(9)->get();
-            });
-            view()->share('pendingorder', $pendingorder);
-            
+
             // Cache order status (30 minutes)
             $orderstatus = Cache::remember('order_status_list', 1800, function () {
                 return OrderStatus::get();

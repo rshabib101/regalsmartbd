@@ -2,9 +2,20 @@
 @section('title',$keyword)
 @push('dataLayer')
 window.dataLayer = window.dataLayer || [];
-window.dataLayer.push({ event: 'search', search_term: '{{ addslashes($keyword ?? '') }}' });
-if (typeof fbq === 'function') fbq('track', 'Search', { search_string: '{{ addslashes($keyword ?? '') }}' });
-if (typeof ttq !== 'undefined') ttq.track('Search', { query: '{{ addslashes($keyword ?? '') }}' });
+window.dataLayer.push({
+    event: 'search',
+    search_term: @json($keyword ?? '')
+});
+if (typeof fbq === 'function') {
+    fbq('track', 'Search', {
+        search_string: @json($keyword ?? '')
+    }, { eventID: '{{ $search_event_id ?? ("search_".time()) }}' });
+}
+if (typeof ttq !== 'undefined') {
+    ttq.track('Search', {
+        query: @json($keyword ?? '')
+    });
+}
 @endpush
 @push('css')
 <link rel="stylesheet" href="{{asset('public/frontEnd/css/jquery-ui.css')}}" />

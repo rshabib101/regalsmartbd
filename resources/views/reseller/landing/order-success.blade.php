@@ -35,33 +35,69 @@
         </div>
     </div>
 
-    {{-- Purchase conversion events (Facebook, TikTok) --}}
-    @if(!empty($landing->facebook_pixel_id))
+    {{-- Purchase conversion events (DataLayer, Facebook, TikTok) --}}
     <script>
-        if (typeof fbq !== 'undefined') {
-            fbq('track', 'Purchase', {
-                value: {{ (float)($order->amount ?? 0) }},
-                currency: 'BDT',
-                order_id: '{{ $order->invoice_id ?? '' }}',
-                content_ids: {{ json_encode($order->orderdetails->pluck('product_id')->toArray() ?? []) }},
-                content_type: 'product',
-                num_items: {{ $order->orderdetails->sum('qty') ?? 0 }}
+        (function() {
+            var orderId = '{{ $order->invoice_id ?? $order->id }}';
+            var storageKey = 'tracked_reseller_order_' + orderId;
+            if (sessionStorage.getItem(storageKey)) return;
+            sessionStorage.setItem(storageKey, '1');
+
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({ ecommerce: null });
+            window.dataLayer.push({
+                event: 'purchase',
+                ecommerce: {
+                    transaction_id: orderId,
+                    value: {{ (float)($order->amount ?? 0) }},
+                    currency: 'BDT',
+                    items: [
+                        @foreach($order->orderdetails as $item)
+                        {
+                            item_id: '{{ $item->product_id }}',
+                            item_name: @json($item->product_name ?? ''),
+                            price: {{ (float)($item->sale_price ?? 0) }},
+                            quantity: {{ (int)($item->qty ?? 1) }}
+                        }@if(!$loop->last),@endif
+                        @endforeach
+                    ]
+                }
             });
-        }
+
+            @if(!empty($landing->facebook_pixel_id))
+            if (typeof fbq !== 'undefined') {
+                fbq('track', 'Purchase', {
+                    value: {{ (float)($order->amount ?? 0) }},
+                    currency: 'BDT',
+                    order_id: orderId,
+                    content_ids: {{ json_encode($order->orderdetails->pluck('product_id')->map(fn($id) => (string)$id)->toArray() ?? []) }},
+                    contents: [
+                        @foreach($order->orderdetails as $item)
+                        { id: '{{ $item->product_id }}', quantity: {{ (int)($item->qty ?? 1) }}, item_price: {{ (float)($item->sale_price ?? 0) }} }@if(!$loop->last),@endif
+                        @endforeach
+                    ],
+                    content_type: 'product',
+                    num_items: {{ (int)($order->orderdetails->sum('qty') ?? 0) }}
+                }, { eventID: 'landing_{{ $order->id }}_{{ $order->invoice_id }}' });
+            }
+            @endif
+
+            @if(!empty($landing->tiktok_pixel_id))
+            if (typeof ttq !== 'undefined') {
+                ttq.track('CompletePayment', {
+                    value: {{ (float)($order->amount ?? 0) }},
+                    currency: 'BDT',
+                    content_id: orderId,
+                    contents: [
+                        @foreach($order->orderdetails as $item)
+                        { content_id: '{{ $item->product_id }}', content_type: 'product', quantity: {{ (int)($item->qty ?? 1) }}, price: {{ (float)($item->sale_price ?? 0) }} }@if(!$loop->last),@endif
+                        @endforeach
+                    ]
+                });
+            }
+            @endif
+        })();
     </script>
-    @endif
-    @if(!empty($landing->tiktok_pixel_id))
-    <script>
-        if (typeof ttq !== 'undefined') {
-            ttq.track('CompletePayment', {
-                value: {{ (float)($order->amount ?? 0) }},
-                currency: 'BDT',
-                content_id: '{{ $order->invoice_id ?? '' }}',
-                contents: [{ content_id: '{{ $order->invoice_id }}', content_type: 'product', quantity: {{ $order->orderdetails->sum('qty') ?? 0 }} }]
-            });
-        }
-    </script>
-    @endif
 
 </body>
 </html>

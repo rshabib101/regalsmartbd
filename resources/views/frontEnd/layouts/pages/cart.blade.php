@@ -265,42 +265,7 @@ window.dataLayer = window.dataLayer || [];
         }
     }
 
-    // ৩) Checkout button -> InitiateCheckout + begin_checkout
-    var checkoutBtn = document.getElementById('checkoutButton');
-    if (checkoutBtn) {
-        checkoutBtn.addEventListener('click', function() {
-            // Facebook Pixel
-            if (typeof fbq === 'function') {
-                fbq('track', 'InitiateCheckout', {
-                    value: cartValue,
-                    currency: currency,
-                    num_items: cartItemCount,
-                    content_ids: cartItems.map(function(i){ return i.item_id; }),
-                    contents: cartItems.map(function(i){ return { id: i.item_id, quantity: i.quantity, item_price: i.price }; })
-                });
-            }
-
-            // TikTok Pixel
-            if (typeof ttq !== 'undefined') {
-                ttq.track('InitiateCheckout', {
-                    value: cartValue,
-                    currency: currency,
-                    quantity: cartItemCount,
-                    content_type: 'product'
-                });
-            }
-
-            // GA4 / GTM
-            window.dataLayer.push({
-                event: 'begin_checkout',
-                ecommerce: {
-                    currency: currency,
-                    value: cartValue,
-                    items: cartItems
-                }
-            });
-        });
-    }
+    // ৩) Checkout transition (handled on checkout page with full CAPI deduplication)
 
     // ৪) Qty Increment -> add_to_cart / update_cart
     $(document).on('click', '.cart_increment', function() {

@@ -72,7 +72,7 @@
                     <div class="main_slider owl-carousel">
                         @foreach ($sliders as $key => $value)
                             <div class="slider-item">
-                                <img src="{{ asset($value->image) }}" alt="" />
+                                <img src="{{ asset($value->image) }}" alt="{{ $generalsetting->name ?? 'Banner' }}" {{ $key > 0 ? 'loading="lazy" decoding="async"' : 'fetchpriority="high"' }} />
                             </div>
                             <!-- slider item -->
                         @endforeach
@@ -125,7 +125,7 @@
                         <div>
                             <div class="text-center ">
                                 <a href="{{ route('category', $value->slug) }}">
-                                    <img class="" src="{{ asset($value->image) }}" alt="" style="border: 2px solid #3c7d17; border-radius: 50%; width: 100%; height: auto;" />
+                                    <img class="" src="{{ asset($value->image) }}" alt="{{ $value->name }}" loading="lazy" decoding="async" style="border: 2px solid #3c7d17; border-radius: 50%; width: 100%; height: auto;" />
                                 </a>
                             </div>
                             <div class="text-center">
@@ -196,7 +196,9 @@
                                 <div class="pro_img">
                                     <a href="{{ route('product', $value->slug) }}">
                                         <img src="{{ asset($value->image ? $value->image->image : '') }}"
-                                            alt="{{ $value->name }}" />
+                                            alt="{{ $value->name }}"
+                                            loading="lazy"
+                                            decoding="async" />
                                     </a>
                                     @if(!is_null($value->stock) && $value->stock < 1)
                                         <div class="stock-out-overlay">STOCK OUT</div>
@@ -307,7 +309,9 @@
                                 <div class="pro_img">
                                     <a href="{{ route('product', $value->slug) }}">
                                         <img src="{{ asset($value->image ? $value->image->image : '') }}"
-                                            alt="{{ $value->name }}" />
+                                            alt="{{ $value->name }}"
+                                            loading="lazy"
+                                            decoding="async" />
                                     </a>
                                     @if(!is_null($value->stock) && $value->stock < 1)
                                         <div class="stock-out-overlay">STOCK OUT</div>
@@ -409,7 +413,7 @@
                             @endif
                             <div class="pro_img">
                                 <a href="{{ route('product',$value->slug) }}">
-                                    <img src="{{ asset($value->image ? $value->image->image : '') }}" alt="{{$value->name}}" />
+                                    <img src="{{ asset($value->image ? $value->image->image : '') }}" alt="{{$value->name}}" loading="lazy" decoding="async" />
                                 </a>
                                 @if(!is_null($value->stock) && $value->stock < 1)
                                     <div class="stock-out-overlay">STOCK OUT</div>
@@ -476,7 +480,7 @@
             @foreach($sliderbottomads as $bottomAds)
             <div class="col-md-12">
                 <a href="{{$bottomAds->link}}?sold=show">
-                    <img class="img-fluid w-100" src="{{$bottomAds->image}}"/>
+                    <img class="img-fluid w-100" src="{{$bottomAds->image}}" alt="Advertisement" loading="lazy" decoding="async" />
                 </a>
             </div>
             @endforeach
@@ -523,7 +527,9 @@
                                     <div class="pro_img">
                                         <a href="{{ route('product', $value->slug) }}">
                                             <img src="{{ asset($value->image ? $value->image->image : '') }}"
-                                                alt="{{ $value->name }}" />
+                                                alt="{{ $value->name }}"
+                                                loading="lazy"
+                                                decoding="async" />
                                         </a>
                                         @if(!is_null($value->stock) && $value->stock < 1)
                                             <div class="stock-out-overlay">STOCK OUT</div>
@@ -598,7 +604,7 @@
           @foreach($campaognads as $campaignAds)
             <div class="col-md-12">
                 <a href="{{$campaignAds->link}}?sold=show">
-                    <img class="img-fluid w-100" src="{{$campaignAds->image}}"/>
+                    <img class="img-fluid w-100" src="{{$campaignAds->image}}" alt="Campaign" loading="lazy" decoding="async" />
                 </a>
             </div>
             @endforeach
@@ -678,7 +684,7 @@
                                 <div class="shop-logo-container">
                                     <div class="shop-logo-circle">
                                         @if($vendor->logo)
-                                            <img src="{{ asset($vendor->logo) }}" alt="{{ $vendor->shop_name }}" />
+                                            <img src="{{ asset($vendor->logo) }}" alt="{{ $vendor->shop_name }}" loading="lazy" decoding="async" />
                                         @else
                                             <div class="shop-logo-initial">
                                                 {{ strtoupper(substr($vendor->shop_name, 0, 1)) }}
@@ -1213,7 +1219,7 @@
                 <div class="customer-review owl-carousel">
                     @foreach ($reviews as $review)
                     <div class="border rounded">
-                        <img class="img-fluid w-100" src="{{ asset($review->image) }}" />
+                        <img class="img-fluid w-100" src="{{ asset($review->image) }}" alt="Customer Review" loading="lazy" decoding="async" />
                     </div>
                     @endforeach
                 </div>
@@ -1230,7 +1236,7 @@
             @foreach($footertopads as $footerAds)
             <div class="col-md-12">
                 <a href="{{$footerAds->link}}?sold=show">
-                    <img class="img-fluid w-100" src="{{$footerAds->image}}"/>
+                    <img class="img-fluid w-100" src="{{$footerAds->image}}" alt="Advertisement" loading="lazy" decoding="async" />
                 </a>
             </div>
             @endforeach

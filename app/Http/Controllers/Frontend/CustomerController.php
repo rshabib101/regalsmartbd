@@ -819,6 +819,7 @@ class CustomerController extends Controller
                 ];
                 if (isset($_COOKIE['_fbp'])) $capiUserData['fbp'] = $_COOKIE['_fbp'];
                 if (isset($_COOKIE['_fbc'])) $capiUserData['fbc'] = $_COOKIE['_fbc'];
+                $ico_event_id = 'ico_' . time();
                 app(\App\Services\FacebookCapiService::class)->sendInitiateCheckout([
                     'currency'     => 'BDT',
                     'value'        => $checkoutValue,
@@ -827,7 +828,7 @@ class CustomerController extends Controller
                     'num_items'    => $cartContent->count(),
                     'content_type' => 'product',
                 ], $capiUserData, [
-                    'event_id'        => 'ico_' . time(),
+                    'event_id'        => $ico_event_id,
                     'event_source_url' => request()->fullUrl(),
                 ]);
 
@@ -840,13 +841,15 @@ class CustomerController extends Controller
                     'ip'         => request()->ip(),
                     'user_agent' => request()->userAgent(),
                 ], [
-                    'event_id'         => 'ico_' . time(),
+                    'event_id'         => $ico_event_id,
                     'event_source_url' => request()->fullUrl(),
                 ]);
             } catch (\Throwable $e) {
                 // non-blocking
             }
         }
+
+        $ico_event_id = $ico_event_id ?? ('ico_' . time());
 
         return view('frontEnd.layouts.customer.checkout',compact(
             'shippingcharge',
@@ -857,7 +860,8 @@ class CustomerController extends Controller
             'advanceTotal',
             'hasAdvance',
             'hasDigital',
-            'hasAllFreeDelivery'
+            'hasAllFreeDelivery',
+            'ico_event_id'
         ));
     }
 

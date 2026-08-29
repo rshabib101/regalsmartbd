@@ -300,6 +300,13 @@
         return m ? m.pop() : '';
     }
 
+    // ── Prevent duplicate tracking on page reload / refresh ──
+    var storageKey = 'tracked_purchase_' + orderId;
+    if (sessionStorage.getItem(storageKey)) {
+        return;
+    }
+    sessionStorage.setItem(storageKey, '1');
+
     // ── GTM / GA4 — purchase event (full ecommerce + customer data) ──
     window.dataLayer = window.dataLayer || [];
     window.dataLayer.push({ ecommerce: null });

@@ -20,6 +20,16 @@
         <link rel="stylesheet" href="{{ asset('public/frontEnd/campaign/css') }}/responsive.css" />
         <!-- ========== DataLayer Initialization ========== -->
         @php
+            $pixels = $pixels ?? collect();
+            if ($pixels->isEmpty()) {
+                $capi = \Illuminate\Support\Facades\Cache::remember('facebook_capi_settings', 3600, fn() => \App\Models\FacebookCapiSetting::where('status', 1)->first());
+                if ($capi && !empty($capi->pixel_id)) {
+                    $pixels = collect([(object)['code' => $capi->pixel_id, 'status' => 1]]);
+                }
+            }
+            $tiktok_pixels  = $tiktok_pixels ?? \Illuminate\Support\Facades\Cache::remember('tiktok_pixels_list', 3600, fn() => \App\Models\TiktokPixel::where('status', 1)->get());
+            $gtm_code       = $gtm_code ?? \Illuminate\Support\Facades\Cache::remember('gtm_code_list', 3600, fn() => \App\Models\GoogleTagManager::where('status', 1)->get());
+
             $camp_name      = strip_tags($campaign_data->name ?? '');
             $camp_slug      = $campaign_data->slug ?? '';
             $camp_id        = (string) $campaign_data->id;
