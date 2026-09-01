@@ -270,7 +270,7 @@
                                     <div class="row align-items-end g-2">
                                         <div class="col-md-10">
                                             <label class="form-label small">Image</label>
-                                            <input type="file" name="image[]" class="form-control form-control-sm" required accept="image/*">
+                                            <input type="file" name="image[]" class="form-control form-control-sm" accept="image/*">
                                         </div>
                                         <div class="col-md-2">
                                             <button class="btn btn-success btn-increment btn-sm w-100" type="button"><i class="fa fa-plus"></i></button>
@@ -480,24 +480,28 @@
             
             // Clear inputs and fix select2
             firstRow.find('.select2-container').remove();
-            firstRow.find('input').val('');
+            firstRow.find('input').each(function() {
+                let name = $(this).attr('name');
+                if (name && name.includes('variant_image')) {
+                    $(this).attr('name', 'variant_image[' + variantIndex + '][image]');
+                }
+                if ($(this).attr('type') === 'file') {
+                    $(this).val('');
+                    $(this).siblings(".variant-img-preview").hide().find("img").attr("src", "");
+                } else {
+                    $(this).val('');
+                }
+            });
             firstRow.find('select').each(function(){
                 let oldName = $(this).attr('name');
                 if (oldName) {
-                    // Handle size array name
                     if (oldName.includes('[size_id][]')) {
                         $(this).attr('name', 'variant_price[' + variantIndex + '][size_id][]');
-                    } else if (oldName.includes('variant_image')) {
-                        $(this).attr('name', 'variant_image[' + variantIndex + '][image]');
                     } else {
                         $(this).attr('name', oldName.replace(/\[\d+\]/, '[' + variantIndex + ']'));
                     }
                 }
-                if ($(this).attr('type') !== 'file') $(this).val(null).trigger('change');
-                else {
-                    $(this).val('');
-                    $(this).siblings(".variant-img-preview").hide().find("img").attr("src", "");
-                }
+                $(this).val(null).trigger('change');
             });
 
             firstRow.find('.btn-remove-row').removeClass('d-none');
@@ -521,6 +525,15 @@
 
         $("body").on("click", ".btn-remove-row", function () {
             $(this).parents(".variant-item").remove();
+        });
+
+        // Auto-sync 1st variant price with New Price input
+        $(document).on('input', 'input[name*="variant_price"][name*="[price]"]', function() {
+            let firstPrice = $('input[name*="variant_price"][name*="[price]"]').filter(function() { return $(this).val(); }).first().val();
+            let $newPrice = $('input[name="new_price"]');
+            if (firstPrice && (!$newPrice.val() || $newPrice.data('auto-synced'))) {
+                $newPrice.val(firstPrice).data('auto-synced', true);
+            }
         });
 
         // Variant Image Preview & Clear
@@ -550,6 +563,8 @@
             
             $('#variant-wrapper .variant-item').each(function() {
                 let $row = $(this);
+                // Ensure file input name matches rowIndex
+                $row.find('.variant-img-input').attr('name', 'variant_image[' + rowIndex + '][image]');
                 let colorId = $row.find('.variant-color-select').val() || null;
                 let selectedSizes = $row.find('.variant-size-select').val() || [];
                 let price = $row.find('input[name*="[price]"]').val() || 0;

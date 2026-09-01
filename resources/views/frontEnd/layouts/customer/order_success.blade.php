@@ -282,6 +282,19 @@
         $custName    = $order->shipping?->name  ?? '';
         $custAddress = $order->shipping?->address ?? '';
         $custArea    = $order->shipping?->area ?? '';
+        $custEmail   = $order->shipping?->email ?? ($order->customer?->email ?? '');
+
+        // Bangladesh phone formatting: 8801XXXXXXXX
+        $rawPhone = preg_replace('/[^0-9]/', '', (string)$custPhone);
+        if (str_starts_with($rawPhone, '01') && strlen($rawPhone) === 11) {
+            $formattedPhone = '88' . $rawPhone;
+        } else {
+            $formattedPhone = $rawPhone;
+        }
+
+        $sha256Phone = !empty($formattedPhone) ? hash('sha256', $formattedPhone) : '';
+        $sha256Name  = !empty($custName) ? hash('sha256', strtolower(trim($custName))) : '';
+        $sha256Email = !empty($custEmail) ? hash('sha256', strtolower(trim($custEmail))) : '';
     @endphp
 
     var purchaseItems  = @json($purchaseItems);
@@ -307,7 +320,7 @@
     }
     sessionStorage.setItem(storageKey, '1');
 
-    // ── GTM / GA4 — purchase event (full ecommerce + customer data) ──
+    // ── GTM / GA4 — purchase event (full ecommerce + Google Enhanced Conversions user_data) ──
     window.dataLayer = window.dataLayer || [];
     window.dataLayer.push({ ecommerce: null });
     window.dataLayer.push({
@@ -323,14 +336,23 @@
             items:          purchaseItems
         },
         user_data: {
-            customer_id:  '{{ $order->customer_id }}',
-            name:         "{{ addslashes($custName) }}",
-            phone:        "{{ $custPhone }}",
-            address:      "{{ addslashes($custAddress) }}",
-            area:         "{{ addslashes($custArea) }}",
-            fbp:          fbp,
-            fbc:          fbc,
-            client_ip:    '{{ request()->ip() }}'
+            customer_id:          '{{ $order->customer_id }}',
+            name:                 "{{ addslashes($custName) }}",
+            phone:                "{{ $custPhone }}",
+            phone_number:         "{{ $formattedPhone }}",
+            email:                "{{ $custEmail }}",
+            sha256_phone:         "{{ $sha256Phone }}",
+            sha256_email_address: "{{ $sha256Email }}",
+            sha256_name:          "{{ $sha256Name }}",
+            address: {
+                street:      "{{ addslashes($custAddress) }}",
+                city:        "{{ addslashes($custArea) }}",
+                region:      "{{ addslashes($custArea) }}",
+                country:     "BD"
+            },
+            fbp:                  fbp,
+            fbc:                  fbc,
+            client_ip:            '{{ request()->ip() }}'
         },
         order_info: {
             invoice_id:     orderId,
@@ -345,8 +367,16 @@
         }
     });
 
-    // ── Facebook Pixel — Purchase (browser-side, event_id দিয়ে CAPI-র সাথে deduplicate) ──
+    // ── Facebook Pixel — Purchase with Advanced Matching & CAPI Deduplication ──
     if (typeof fbq === 'function') {
+        var amData = {};
+        @if($sha256Phone) amData.ph = '{{ $sha256Phone }}'; @endif
+        @if($sha256Email) amData.em = '{{ $sha256Email }}'; @endif
+        @if($sha256Name)  amData.fn = '{{ $sha256Name }}'; @endif
+        if (Object.keys(amData).length > 0) {
+            fbq('setUserProperties', amData);
+        }
+
         fbq('track', 'Purchase', {
             value:        grandTotal,
             currency:     'BDT',

@@ -79,6 +79,7 @@ Route::get('admin/clear-cache', function () {
 
 // Public Facebook Product Catalog CSV Data Feed
 Route::get('facebook-catalog.csv', [FacebookCatalogController::class, 'feed'])->name('facebook.catalog.feed');
+Route::get('facebook-catalog.xml', [FacebookCatalogController::class, 'xmlFeed'])->name('facebook.catalog.xml');
 
 // Admin root route - redirect to login if not authenticated, otherwise to dashboard
 Route::get('admin', function () {

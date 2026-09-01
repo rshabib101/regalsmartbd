@@ -161,9 +161,28 @@ class Product extends Model
         return $query->where('is_wholesale', 1);
     }
 
-    // Scope: Regular products
-    public function scopeRegular($query)
+    // হেল্পার: এই প্রোডাক্টের ভ্যারিয়েন্ট আছে কি না
+    public function hasVariants(): bool
     {
-        return $query->where('is_wholesale', 0);
+        if ($this->relationLoaded('variantPrices')) {
+            if ($this->variantPrices->isNotEmpty()) return true;
+        } elseif ($this->variantPrices()->exists()) {
+            return true;
+        }
+
+        if ($this->relationLoaded('prosizes') && $this->prosizes->isNotEmpty()) return true;
+        if ($this->relationLoaded('procolors') && $this->procolors->isNotEmpty()) return true;
+
+        return false;
+    }
+
+    // হেল্পার/অ্যাক্সেসর: হোম ও লিস্টিং এ দেখানোর উপযুক্ত মূল প্রাইস (১ম ভ্যারিয়েন্টের প্রাইস)
+    public function getDisplayPriceAttribute()
+    {
+        if ($this->relationLoaded('variantPrices') && $this->variantPrices->isNotEmpty()) {
+            $first = $this->variantPrices->first();
+            if ($first && $first->price > 0) return $first->price;
+        }
+        return $this->new_price;
     }
 }

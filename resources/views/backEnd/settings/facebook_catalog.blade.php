@@ -193,7 +193,8 @@
                         নিচের ফিড লিংকটি কপি করে Meta Commerce Manager-এর <strong>Data Sources &gt; Data Feed &gt; Scheduled Feed</strong>-এ বসিয়ে দিন। ফেসবুক স্বয়ংক্রিয়ভাবে প্রতিদিন বা প্রতি ঘণ্টায় আপনার ওয়েবসাইটের নতুন প্রোডাক্ট, দাম এবং স্টক আপডেট করে নেবে।
                     </p>
 
-                    <div class="url-copy-box">
+                    <div class="url-copy-box mb-3">
+                        <span class="badge bg-primary me-2">CSV Feed</span>
                         <input
                             type="text"
                             class="url-input"
@@ -201,13 +202,32 @@
                             value="{{ $feedUrl }}"
                             readonly
                         >
-                        <button type="button" class="btn-copy-url" onclick="copyCatalogUrl()">
+                        <button type="button" class="btn-copy-url" onclick="copyCatalogUrl('catalogFeedUrl', 'copyIcon', 'copyText')">
                             <i class="far fa-copy" id="copyIcon"></i>
-                            <span id="copyText">Copy Feed URL</span>
+                            <span id="copyText">Copy CSV</span>
                         </button>
                         <a href="{{ route('admin.facebook_catalog.download') }}" class="btn-download-csv">
                             <i class="fas fa-download"></i>
                             <span>Download CSV</span>
+                        </a>
+                    </div>
+
+                    <div class="url-copy-box">
+                        <span class="badge bg-success me-2">XML RSS Feed</span>
+                        <input
+                            type="text"
+                            class="url-input"
+                            id="catalogXmlFeedUrl"
+                            value="{{ $xmlFeedUrl ?? url('facebook-catalog.xml') }}"
+                            readonly
+                        >
+                        <button type="button" class="btn-copy-url" style="background:#059669;" onclick="copyCatalogUrl('catalogXmlFeedUrl', 'copyXmlIcon', 'copyXmlText')">
+                            <i class="far fa-copy" id="copyXmlIcon"></i>
+                            <span id="copyXmlText">Copy XML</span>
+                        </button>
+                        <a href="{{ url('facebook-catalog.xml') }}" target="_blank" class="btn-download-csv" style="background:#4b5563;">
+                            <i class="fas fa-external-link-alt"></i>
+                            <span>View XML</span>
                         </a>
                     </div>
                 </div>
@@ -381,18 +401,21 @@
 
 @section('script')
 <script>
-    function copyCatalogUrl() {
-        const input = document.getElementById('catalogFeedUrl');
+    function copyCatalogUrl(inputId, iconId, textId) {
+        inputId = inputId || 'catalogFeedUrl';
+        iconId  = iconId  || 'copyIcon';
+        textId  = textId  || 'copyText';
+        const input = document.getElementById(inputId);
         input.select();
         input.setSelectionRange(0, 99999);
         navigator.clipboard.writeText(input.value).then(function() {
-            const btnText = document.getElementById('copyText');
-            const icon = document.getElementById('copyIcon');
+            const btnText = document.getElementById(textId);
+            const icon = document.getElementById(iconId);
             btnText.innerText = 'Copied!';
             icon.className = 'fas fa-check';
             
             setTimeout(() => {
-                btnText.innerText = 'Copy Feed URL';
+                btnText.innerText = (inputId === 'catalogFeedUrl') ? 'Copy CSV' : 'Copy XML';
                 icon.className = 'far fa-copy';
             }, 3000);
         });

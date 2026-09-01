@@ -982,12 +982,22 @@ document.addEventListener('DOMContentLoaded', function () {
         let variantIndex = 0;
         let rowIndex = 0;
         
-            $('#variant-wrapper .variant-item').each(function() {
-                let $row = $(this);
-                let colorId = $row.find('.variant-color-select').val() || null;
-                let selectedSizes = $row.find('.variant-size-select').val() || [];
-                let price = $row.find('input[name*="[price]"]').val() || 0;
-                let stock = $row.find('input[name*="[stock]"]').val() || 0;
+        // Auto-sync 1st variant price with New Price input
+        $(document).on('input', 'input[name*="variant_price"][name*="[price]"]', function() {
+            let firstPrice = $('input[name*="variant_price"][name*="[price]"]').filter(function() { return $(this).val(); }).first().val();
+            let $newPrice = $('input[name="new_price"]');
+            if (firstPrice && (!$newPrice.val() || $newPrice.data('auto-synced'))) {
+                $newPrice.val(firstPrice).data('auto-synced', true);
+            }
+        });
+
+        $('#variant-wrapper .variant-item').each(function() {
+            let $row = $(this);
+            $row.find('.variant-img-input').attr('name', 'variant_image[' + rowIndex + '][image]');
+            let colorId = $row.find('.variant-color-select').val() || null;
+            let selectedSizes = $row.find('.variant-size-select').val() || [];
+            let price = $row.find('input[name*="[price]"]').val() || 0;
+            let stock = $row.find('input[name*="[stock]"]').val() || 0;
                 
                 // Validate: At least color or size must be selected
                 if (!colorId && selectedSizes.length === 0) {

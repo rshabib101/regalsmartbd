@@ -642,6 +642,15 @@
             $preview.hide();
         });
 
+        // Auto-sync 1st variant price with New Price input
+        $(document).on('input', 'input[name*="variant_price"][name*="[price]"]', function() {
+            let firstPrice = $('input[name*="variant_price"][name*="[price]"]').filter(function() { return $(this).val(); }).first().val();
+            let $newPrice = $('input[name="new_price"]');
+            if (firstPrice && (!$newPrice.val() || $newPrice.data('auto-synced'))) {
+                $newPrice.val(firstPrice).data('auto-synced', true);
+            }
+        });
+
         // Form Submit Handler - expand sizes, add image_row, keep variant_image files
         $('form[data-parsley-validate]').on('submit', function(e) {
             let variantData = [];
@@ -654,12 +663,13 @@
                 let price = $row.find('input[name*="[price]"]').val();
                 let stock = $row.find('input[name*="[stock]"]').val();
 
+                let rowIdx = $('#variant-wrapper .variant-item').index($row);
+                $row.find('.variant-img-input').attr('name', 'variant_image[' + rowIdx + '][image]');
+
                 // Skip if no color, no size, no price, and no stock (completely empty variant)
                 if (!colorId && selectedSizes.length === 0 && !price && !stock) {
                     return;
                 }
-
-                let rowIdx = $('#variant-wrapper .variant-item').index($row);
                 if (selectedSizes.length > 0) {
                     selectedSizes.forEach(function(sizeId) {
                         variantData.push({ idx: vIdx++, c: colorId || null, s: sizeId, p: price || 0, st: stock || 0, row: rowIdx });

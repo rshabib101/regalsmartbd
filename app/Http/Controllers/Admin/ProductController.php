@@ -190,7 +190,16 @@ class ProductController extends Controller
         $this->handleVideoInput($request, $input, null);
 
         // Price & stock optional – না দিলে ০ ধরা হবে
-        $input['new_price']      = $request->filled('new_price') ? $request->new_price : 0;
+        $firstVariantPrice = null;
+        if ($request->variant_price && is_array($request->variant_price)) {
+            foreach ($request->variant_price as $vp) {
+                if ((!empty($vp['color_id']) || !empty($vp['size_id'])) && isset($vp['price']) && $vp['price'] !== '') {
+                    $firstVariantPrice = (float) $vp['price'];
+                    break;
+                }
+            }
+        }
+        $input['new_price']      = $request->filled('new_price') ? $request->new_price : ($firstVariantPrice ?? 0);
         $input['purchase_price'] = $request->filled('purchase_price') ? $request->purchase_price : 0;
         $input['stock']          = $request->filled('stock') ? (int) $request->stock : 0;
 
@@ -294,6 +303,10 @@ class ProductController extends Controller
                     'stock'      => $variant['stock'] ?? 0,
                 ]);
             }
+
+            if ($firstVariantPrice !== null) {
+                $product->update(['new_price' => $firstVariantPrice]);
+            }
         }
 
         // VARIANT IMAGES (from Product Variants - variant_image[row_index][image], image_row links to row)
@@ -304,10 +317,10 @@ class ProductController extends Controller
                 $imageRow = $vp['image_row'] ?? $idx;
                 $colorId = $vp['color_id'] ?? null;
                 $sizeId = $vp['size_id'] ?? null;
-                if (!$colorId) continue;
+                if (!$colorId && !$sizeId) continue;
                 $file = $request->file("variant_image.{$imageRow}.image");
                 if (!$file) continue;
-                $key = $colorId . '_' . ($sizeId ?: '0');
+                $key = ($colorId ?: '0') . '_' . ($sizeId ?: '0');
                 if (isset($doneKeys[$key])) continue;
                 $doneKeys[$key] = true;
                 if (!isset($savedFiles[$imageRow])) {
@@ -320,7 +333,7 @@ class ProductController extends Controller
                 Productimage::create([
                     'product_id' => $product->id,
                     'image'      => $savedFiles[$imageRow],
-                    'color_id'   => $colorId,
+                    'color_id'   => $colorId ?: null,
                     'size_id'    => $sizeId ?: null,
                 ]);
             }
@@ -454,7 +467,16 @@ class ProductController extends Controller
         }
 
         // Price & stock optional – আপডেটে না দিলে ০ ধরা হবে
-        $input['new_price']      = $request->filled('new_price') ? $request->new_price : 0;
+        $firstVariantPrice = null;
+        if ($request->variant_price && is_array($request->variant_price)) {
+            foreach ($request->variant_price as $vp) {
+                if ((!empty($vp['color_id']) || !empty($vp['size_id'])) && isset($vp['price']) && $vp['price'] !== '') {
+                    $firstVariantPrice = (float) $vp['price'];
+                    break;
+                }
+            }
+        }
+        $input['new_price']      = $request->filled('new_price') ? $request->new_price : ($firstVariantPrice ?? 0);
         $input['purchase_price'] = $request->filled('purchase_price') ? $request->purchase_price : 0;
         $input['stock']          = $request->filled('stock') ? (int) $request->stock : 0;
 
@@ -552,10 +574,10 @@ class ProductController extends Controller
                 $imageRow = $vp['image_row'] ?? $idx;
                 $colorId = $vp['color_id'] ?? null;
                 $sizeId = $vp['size_id'] ?? null;
-                if (!$colorId) continue;
+                if (!$colorId && !$sizeId) continue;
                 $file = $request->file("variant_image.{$imageRow}.image");
                 if (!$file) continue;
-                $key = $colorId . '_' . ($sizeId ?: '0');
+                $key = ($colorId ?: '0') . '_' . ($sizeId ?: '0');
                 if (isset($doneKeys[$key])) continue;
                 $doneKeys[$key] = true;
                 if (!isset($savedFiles[$imageRow])) {
@@ -568,7 +590,7 @@ class ProductController extends Controller
                 Productimage::create([
                     'product_id' => $product->id,
                     'image'      => $savedFiles[$imageRow],
-                    'color_id'   => $colorId,
+                    'color_id'   => $colorId ?: null,
                     'size_id'    => $sizeId ?: null,
                 ]);
             }
@@ -588,6 +610,10 @@ class ProductController extends Controller
                     'price'      => $variant['price'] ?? 0,
                     'stock'      => $variant['stock'] ?? 0,
                 ]);
+            }
+
+            if ($firstVariantPrice !== null) {
+                $product->update(['new_price' => $firstVariantPrice]);
             }
         }
 

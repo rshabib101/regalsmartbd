@@ -50,7 +50,7 @@
             }
         @endphp
 
-        {{-- Base Data Layer --}}
+        {{-- Base Data Layer & Customer Identity --}}
         <script>
             window.dataLayer = window.dataLayer || [];
             window.dataLayer.push({
@@ -59,6 +59,16 @@
                 siteName: '{{ addslashes($generalsetting->name ?? "") }}',
                 currency: 'BDT',
                 language: 'bn'
+                @if($authCust)
+                ,user_data: {
+                    customer_id: '{{ $authCust->id }}',
+                    name: '{{ addslashes($authCust->name ?? "") }}',
+                    phone: '{{ $authCust->phone ?? "" }}',
+                    email: '{{ $authCust->email ?? "" }}',
+                    sha256_email: '{{ !empty($authCust->email) ? hash("sha256", strtolower(trim($authCust->email))) : "" }}',
+                    sha256_phone: '{{ !empty($fbUserData["ph"]) ? $fbUserData["ph"] : "" }}'
+                }
+                @endif
             });
         </script>
 
@@ -1937,22 +1947,27 @@ document.getElementById("chatToggle").addEventListener("click", function() {
         <script src="{{asset('public/backEnd/')}}/assets/js/toastr.min.js"></script>
         {!! Toastr::message() !!} @stack('script')
         <script>
-            $(".quick_view").on("click", function () {
+            $(document).on("click", ".quick_view, .open-variant-modal", function (e) {
+                e.preventDefault();
                 var id = $(this).data("id");
+                var action = $(this).data("action") || 'order_now';
                 $("#loading").show();
                 if (id) {
                     $.ajax({
                         type: "GET",
-                        data: { id: id },
+                        data: { id: id, action: action },
                         url: "{{route('quickview')}}",
                         success: function (data) {
+                            $("#loading").hide();
                             if (data) {
                                 $("#custom-modal").html(data);
-                                $("#custom-modal").show();
-                                $("#loading").hide();
-                                $("#page-overlay").show();
+                                $("#custom-modal").fadeIn(200);
+                                $("#page-overlay").fadeIn(200);
                             }
                         },
+                        error: function() {
+                            $("#loading").hide();
+                        }
                     });
                 }
             });
@@ -2078,6 +2093,8 @@ document.getElementById("chatToggle").addEventListener("click", function() {
                             if (data.redirect || hasOrderNow) {
                                 window.location.href = checkoutUrl;
                             } else {
+                                $("#custom-modal").fadeOut(150, function() { $(this).empty(); });
+                                $("#page-overlay").fadeOut(150);
                                 runFlyToCart($form, function() { if (typeof openSidebarCart === "function") openSidebarCart(); });
                             }
                         } else {
@@ -2290,7 +2307,8 @@ document.getElementById("chatToggle").addEventListener("click", function() {
             });
 
             $("#page-overlay").on("click", function () {
-                $("#page-overlay").hide();
+                $("#page-overlay").fadeOut(150);
+                $("#custom-modal").fadeOut(150, function() { $(this).empty(); });
                 $(".mobile-menu").removeClass("active");
                 $(".feature-products").removeClass("active");
             });

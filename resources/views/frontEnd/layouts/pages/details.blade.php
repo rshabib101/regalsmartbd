@@ -2,6 +2,9 @@
 @section('title', $details->name)
 @php
     $pageType = 'product';
+    $firstVariant = ($details->variantPrices && $details->variantPrices->count() > 0) ? $details->variantPrices->first() : null;
+    $displayPrice = ($firstVariant && $firstVariant->price > 0) ? $firstVariant->price : ($details->new_price ?? 0);
+    $firstVariantUnit = optional($firstVariant?->size)->sizeName ?? ($details->pro_unit ?? '');
 @endphp
 @push('dataLayer')
 window.dataLayer = window.dataLayer || [];
@@ -10,14 +13,14 @@ window.dataLayer.push({
     event: 'view_item',
     ecommerce: {
         currency: 'BDT',
-        value: {{ (float) ($details->new_price ?? 0) }},
+        value: {{ (float) $displayPrice }},
         items: [{
             item_id: '{{ $details->id }}',
             item_name: @json($details->name),
-            price: {{ (float) ($details->new_price ?? 0) }},
-            item_brand: @json(optional($details->brand)->name ?? ''),
+            price: {{ (float) $displayPrice }},
+            item_brand: @json(optional($details->brand)->name ?? ($generalsetting->name ?? '')),
             item_category: @json(optional($details->category)->name ?? ''),
-            item_variant: @json($details->pro_unit ?? ''),
+            item_variant: @json($firstVariantUnit),
             quantity: 1
         }]
     }
@@ -51,7 +54,7 @@ if (typeof fbq === 'function') {
         content_name: @json($details->name),
         content_category: @json(optional($details->category)->name ?? ''),
         content_type: 'product',
-        value: {{ (float) ($details->new_price ?? 0) }},
+        value: {{ (float) $displayPrice }},
         currency: 'BDT'
     }, { eventID: '{{ $vc_event_id ?? ("vc_prod_".$details->id."_".time()) }}' });
 }
@@ -60,7 +63,7 @@ if (typeof ttq !== 'undefined') {
         content_type: 'product',
         content_id: '{{ $details->id }}',
         content_name: @json($details->name),
-        value: {{ (float) ($details->new_price ?? 0) }},
+        value: {{ (float) $displayPrice }},
         currency: 'BDT'
     });
 }
@@ -71,6 +74,9 @@ if (typeof ttq !== 'undefined') {
     $metaDescription = $details->meta_description ?? Str::limit(strip_tags($details->description), 160);
     $metaKeywords = $details->meta_keywords ?? $details->name;
     $metaImage = $details->meta_image ? asset($details->meta_image) : asset(optional($details->image)->image);
+    $brandName = optional($details->brand)->name ?? ($generalsetting->name ?? 'Smart Grammo Bazar');
+    $categoryName = optional($details->category)->name ?? 'General';
+    $inStock = (!is_null($details->stock) && $details->stock < 1) ? false : true;
 @endphp
 
 <meta name="app-url" content="{{ route('product', $details->slug) }}" />
@@ -93,7 +99,75 @@ if (typeof ttq !== 'undefined') {
 <meta property="og:url" content="{{ route('product', $details->slug) }}" />
 <meta property="og:image" content="{{ $metaImage }}" />
 <meta property="og:description" content="{{ $metaDescription }}" />
-<meta property="og:site_name" content="gomobd.com" />
+<meta property="og:site_name" content="{{ $generalsetting->name ?? 'Smart Grammo Bazar' }}" />
+
+<!-- Facebook / Meta Product Catalog Microdata -->
+<meta property="product:retailer_item_id" content="{{ $details->id }}" />
+<meta property="product:price:amount" content="{{ $displayPrice }}" />
+<meta property="product:price:currency" content="BDT" />
+@if($details->old_price && $details->old_price > $displayPrice)
+<meta property="product:sale_price:amount" content="{{ $displayPrice }}" />
+<meta property="product:sale_price:currency" content="BDT" />
+<meta property="product:original_price:amount" content="{{ $details->old_price }}" />
+@endif
+<meta property="product:availability" content="{{ $inStock ? 'in stock' : 'out of stock' }}" />
+<meta property="product:condition" content="new" />
+<meta property="product:brand" content="{{ $brandName }}" />
+<meta property="product:category" content="{{ $categoryName }}" />
+
+@php
+    $schemaImages = [$metaImage];
+    if ($details->images && $details->images->count() > 0) {
+        foreach ($details->images->take(4) as $extraImg) {
+            if (!empty($extraImg->image)) {
+                $schemaImages[] = asset($extraImg->image);
+            }
+        }
+    }
+
+    $schemaData = [
+        '@context'    => 'https://schema.org/',
+        '@type'       => 'Product',
+        'name'        => $details->name,
+        'image'       => $schemaImages,
+        'description' => $metaDescription,
+        'sku'         => $details->product_code ?: (string)$details->id,
+        'mpn'         => (string)$details->id,
+        'brand'       => [
+            '@type' => 'Brand',
+            'name'  => $brandName,
+        ],
+        'category'    => $categoryName,
+        'offers'      => [
+            '@type'           => 'Offer',
+            'url'             => route('product', $details->slug),
+            'priceCurrency'   => 'BDT',
+            'price'           => (string)$displayPrice,
+            'priceValidUntil' => date('Y-12-31', strtotime('+1 year')),
+            'itemCondition'   => 'https://schema.org/NewCondition',
+            'availability'    => $inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+            'seller'          => [
+                '@type' => 'Organization',
+                'name'  => $generalsetting->name ?? 'Smart Grammo Bazar',
+            ],
+        ],
+    ];
+
+    if (isset($reviews) && $reviews->count() > 0 && isset($item_count) && $item_count > 0) {
+        $schemaData['aggregateRating'] = [
+            '@type'       => 'AggregateRating',
+            'ratingValue' => number_format($reviews->avg('ratting'), 1),
+            'reviewCount' => (string)$item_count,
+            'bestRating'  => '5',
+            'worstRating' => '1',
+        ];
+    }
+@endphp
+
+<!-- Schema.org JSON-LD Structured Data (Google & Meta Merchant standard) -->
+<script type="application/ld+json">
+{!! json_encode($schemaData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) !!}
+</script>
 @endpush
 
 
@@ -388,6 +462,7 @@ if (typeof ttq !== 'undefined') {
                                     value="{{ $procolor->id }}"
                                     name="product_color"
                                     class="selector-item_radio emptyalert"
+                                    {{ $loop->first ? 'checked' : '' }}
                                     required />
                                 <label for="fc-option{{ $procolor->id }}"
                                     style="background-color: {{ $procolor->color ?? '#ccc' }}"
@@ -419,6 +494,7 @@ if (typeof ttq !== 'undefined') {
                                     value="{{ $prosize->id }}"
                                     name="product_size"
                                     class="selector-item_radio emptyalert"
+                                    {{ $loop->first ? 'checked' : '' }}
                                     required />
                                 <label for="f-option{{ $prosize->id }}" class="selector-item_label">
                                     {{ $prosize->sizeName ?? $prosize->name }}
@@ -701,58 +777,68 @@ if (typeof ttq !== 'undefined') {
                             <i class="far fa-star"></i>
                         @endfor
 
+                        @php
+                            $cardPrice = ($value->variantPrices && $value->variantPrices->isNotEmpty() && $value->variantPrices->first()->price > 0)
+                                ? $value->variantPrices->first()->price 
+                                : $value->new_price;
+                            $hasVariants = ($value->variantPrices && $value->variantPrices->isNotEmpty()) 
+                                || ($value->prosizes && $value->prosizes->isNotEmpty()) 
+                                || ($value->procolors && $value->procolors->isNotEmpty());
+                        @endphp
                         <div class="pro_price">
                             <p>
-                                <del>৳ {{ $value->old_price }}</del>
-                                ৳ {{ $value->new_price }}
+                                @if($value->old_price && $value->old_price > $cardPrice)
+                                    <del>৳ {{ $value->old_price }}</del>
+                                @endif
+                                ৳ {{ $cardPrice }}
                             </p>
                         </div>
 
-                        {{-- ⭐⭐⭐ BUTTON AREA (Added) ⭐⭐⭐ --}}
-                        @if (!$value->prosizes->isEmpty() || !$value->procolors->isEmpty())
-                        {{-- ভ্যারিয়েন্ট আছে = দুই বাটনই product details page এ যাবে --}}
-                        <div class="pro_btn">
-
-                            <a href="{{ route('product', $value->slug) }}" 
-                                class="order-btn-link order-btn">
-                                অর্ডার করুন
-                            </a>
-
-                            <a href="{{ route('product', $value->slug) }}" 
-                                class="cart-icon-link cart-icon-btn">
-                                <i class="fa-solid fa-cart-shopping"></i>
-                            </a>
-
-                        </div>
-
-                        @else
-                        {{-- ভ্যারিয়েন্ট নেই = Order Now + Add to Cart --}}
-                        <div class="pro_btn">
-
-                            {{-- Order Now --}}
-                            <form action="{{ route('cart.store') }}" method="POST" class="ajax-cart-form">
-                                @csrf
-                                <input type="hidden" name="id" value="{{ $value->id }}">
-                                <input type="hidden" name="qty" value="1">
-                                <input type="hidden" name="order_now" value="1">
-
-                                <button type="submit" class="order-btn">
+                        {{-- বাটন লজিক: স্টক আউট / ভ্যারিয়েন্ট মডাল / ডাইরেক্ট কার্ট --}}
+                        @if (!is_null($value->stock) && $value->stock < 1)
+                            <div class="pro_btn">
+                                <a href="{{ route('product', $value->slug) }}" class="order-btn-link order-btn">
+                                    স্টক আউট
+                                </a>
+                                <a href="{{ route('product', $value->slug) }}" class="cart-icon-link cart-icon-btn">
+                                    <i class="fa-solid fa-cart-shopping"></i>
+                                </a>
+                            </div>
+                        @elseif ($hasVariants)
+                            <div class="pro_btn">
+                                <button type="button" class="order-btn open-variant-modal" data-id="{{ $value->id }}" data-action="order_now">
                                     অর্ডার করুন
                                 </button>
-                            </form>
-
-                            {{-- Add to Cart --}}
-                            <form action="{{ route('cart.store') }}" method="POST" class="ajax-cart-form">
-                                @csrf
-                                <input type="hidden" name="id" value="{{ $value->id }}">
-                                <input type="hidden" name="qty" value="1">
-
-                                <button type="submit" class="cart-icon-btn">
+                                <button type="button" class="cart-icon-btn open-variant-modal" data-id="{{ $value->id }}" data-action="add_cart">
                                     <i class="fa-solid fa-cart-shopping"></i>
                                 </button>
-                            </form>
+                            </div>
+                        @else
+                            {{-- ভ্যারিয়েন্ট নেই = Order Now + Add to Cart --}}
+                            <div class="pro_btn">
+                                {{-- Order Now --}}
+                                <form action="{{ route('cart.store') }}" method="POST" class="ajax-cart-form">
+                                    @csrf
+                                    <input type="hidden" name="id" value="{{ $value->id }}">
+                                    <input type="hidden" name="qty" value="1">
+                                    <input type="hidden" name="order_now" value="1">
 
-                        </div>
+                                    <button type="submit" class="order-btn">
+                                        অর্ডার করুন
+                                    </button>
+                                </form>
+
+                                {{-- Add to Cart --}}
+                                <form action="{{ route('cart.store') }}" method="POST" class="ajax-cart-form">
+                                    @csrf
+                                    <input type="hidden" name="id" value="{{ $value->id }}">
+                                    <input type="hidden" name="qty" value="1">
+
+                                    <button type="submit" class="cart-icon-btn">
+                                        <i class="fa-solid fa-cart-shopping"></i>
+                                    </button>
+                                </form>
+                            </div>
                         @endif
 
                     </div>
@@ -891,38 +977,61 @@ if (typeof ttq !== 'undefined') {
 
         $('#newPrice').text('৳' + basePrice.toFixed(2));
     }
-    
-    // Call on page load if color/size is already selected
-    $(document).ready(function() {
-        updateVariantPrice();
-    });
 
-    $(document).on(
-        'change',
-        "input[name='product_color'], input[name='product_size']",
-        updateVariantPrice
-    );
+    // ভ্যারিয়েন্ট ইমেজ লিস্ট (কালার ও সাইজ উভয়টি অন্তর্ভুক্ত)
+    @php
+        $productImagesList = [];
+        if ($details->images) {
+            foreach ($details->images as $img) {
+                $productImagesList[] = [
+                    'src'      => asset($img->image),
+                    'color_id' => !empty($img->color_id) ? (string)$img->color_id : null,
+                    'size_id'  => !empty($img->size_id) ? (string)$img->size_id : null,
+                ];
+            }
+        }
+    @endphp
+    var productImages = {!! json_encode($productImagesList) !!};
 
-    // কালার সিলেক্ট করলে ঐ কালারের ইমেজ দেখাবে
-    var productImages = @json($details->images->map(function($img) {
-        return ['src' => asset($img->image), 'color_id' => $img->color_id];
-    }));
-
-    function updateImagesByColor(colorId) {
+    function updateImagesByVariant(colorId, sizeId) {
         var colorIdStr = colorId ? String(colorId) : null;
+        var sizeIdStr  = sizeId ? String(sizeId) : null;
         var filteredImages = [];
 
-        if (colorIdStr) {
-            var colorSpecific = productImages.filter(function(img) {
-                return img.color_id && String(img.color_id) === colorIdStr;
+        // ১. কালার এবং সাইজ উভয় মিলে
+        if (colorIdStr && sizeIdStr) {
+            filteredImages = productImages.filter(function(img) {
+                return img.color_id === colorIdStr && img.size_id === sizeIdStr;
             });
-            var defaultImages = productImages.filter(function(img) { return !img.color_id; });
-            filteredImages = colorSpecific.length > 0 ? colorSpecific : defaultImages;
-        } else {
-            filteredImages = productImages.filter(function(img) { return !img.color_id; });
-            if (filteredImages.length === 0) filteredImages = productImages;
         }
-        if (filteredImages.length === 0) filteredImages = productImages;
+
+        // ২. শুধুমাত্র সাইজ মিলে (যদি সাইজ সিলেক্ট করা থাকে এবং স্পেসিফিক ইমেজ থাকে)
+        if (filteredImages.length === 0 && sizeIdStr) {
+            filteredImages = productImages.filter(function(img) {
+                return img.size_id === sizeIdStr;
+            });
+        }
+
+        // ৩. শুধুমাত্র কালার মিলে
+        if (filteredImages.length === 0 && colorIdStr) {
+            filteredImages = productImages.filter(function(img) {
+                return img.color_id === colorIdStr;
+            });
+        }
+
+        // ৪. ডিফল্ট ইমেজ (যেগুলোতে কালার বা সাইজ নেই)
+        if (filteredImages.length === 0) {
+            filteredImages = productImages.filter(function(img) {
+                return !img.color_id && !img.size_id;
+            });
+        }
+
+        // ৫. ফলব্যাক: সকল ইমেজ
+        if (filteredImages.length === 0) {
+            filteredImages = productImages;
+        }
+
+        if (filteredImages.length === 0) return;
 
         var $slider = $(".details_slider");
         var owl = $slider.data("owl.carousel");
@@ -965,9 +1074,26 @@ if (typeof ttq !== 'undefined') {
         }
     }
 
-    $(document).on("change", "input[name='product_color']", function() {
-        updateImagesByColor($(this).val() || null);
+    // Call on page load if color/size is already selected
+    $(document).ready(function() {
+        updateVariantPrice();
+        var initialColor = $("input[name='product_color']:checked").val() || null;
+        var initialSize  = $("input[name='product_size']:checked").val() || null;
+        if (initialColor || initialSize) {
+            updateImagesByVariant(initialColor, initialSize);
+        }
     });
+
+    $(document).on(
+        'change',
+        "input[name='product_color'], input[name='product_size']",
+        function() {
+            updateVariantPrice();
+            var c = $("input[name='product_color']:checked").val() || null;
+            var s = $("input[name='product_size']:checked").val() || null;
+            updateImagesByVariant(c, s);
+        }
+    );
 </script>
 
 

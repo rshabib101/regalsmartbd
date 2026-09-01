@@ -1095,7 +1095,94 @@
             });
         }
 
-        // On form submit: GA4 add_payment_info + Pixel AddPaymentInfo
+        // Real-time Advanced Matching & Ecommerce Interactions
+        $(document).ready(function() {
+            function normalizePhoneBD(raw) {
+                var p = (raw || '').replace(/[^0-9]/g, '');
+                if (p.startsWith('01') && p.length === 11) {
+                    return '88' + p;
+                }
+                return p;
+            }
+
+            // Real-time Phone Capture
+            $('input[name="phone"]').on('blur change', function() {
+                var raw = $(this).val();
+                var formatted = normalizePhoneBD(raw);
+                if (formatted.length >= 11) {
+                    window.dataLayer = window.dataLayer || [];
+                    window.dataLayer.push({
+                        event: 'user_data_update',
+                        user_data: { phone_number: formatted }
+                    });
+                    if (typeof fbq === 'function') {
+                        fbq('setUserProperties', { ph: formatted });
+                    }
+                }
+            });
+
+            // Real-time Name Capture
+            $('input[name="name"]').on('blur change', function() {
+                var nameVal = $(this).val().trim();
+                if (nameVal.length > 2) {
+                    window.dataLayer = window.dataLayer || [];
+                    window.dataLayer.push({
+                        event: 'user_data_update',
+                        user_data: { name: nameVal }
+                    });
+                    if (typeof fbq === 'function') {
+                        fbq('setUserProperties', { fn: nameVal });
+                    }
+                }
+            });
+
+            // GA4: add_shipping_info when delivery area is selected
+            $('#area').on('change', function() {
+                var selectedText = $(this).find('option:selected').text().trim();
+                if (selectedText && selectedText !== 'এরিয়া নির্বাচন করুন...') {
+                    window.dataLayer = window.dataLayer || [];
+                    window.dataLayer.push({ ecommerce: null });
+                    window.dataLayer.push({
+                        event: "add_shipping_info",
+                        ecommerce: {
+                            currency: "BDT",
+                            value: grandTotal,
+                            shipping_tier: selectedText,
+                            coupon: coupon,
+                            items: ga4Items
+                        }
+                    });
+                }
+            });
+
+            // GA4: add_payment_info when payment method is clicked
+            $('input[name="payment_method"]').on('change', function() {
+                var pMethod = $(this).val();
+                window.dataLayer = window.dataLayer || [];
+                window.dataLayer.push({ ecommerce: null });
+                window.dataLayer.push({
+                    event: "add_payment_info",
+                    payment_type: pMethod,
+                    ecommerce: {
+                        currency: "BDT",
+                        value: payableNow,
+                        coupon: coupon,
+                        items: ga4Items
+                    }
+                });
+                if (typeof fbq === 'function') {
+                    fbq("track", "AddPaymentInfo", {
+                        value: payableNow,
+                        currency: "BDT",
+                        payment_method: pMethod,
+                        num_items: items.length,
+                        content_ids: items.map(function(i){ return String(i.id); })
+                    });
+                }
+            });
+        });
+
+        // On form submit: GA4 add_payment_info fallback
         document.addEventListener("DOMContentLoaded", function () {
             var form = document.getElementById("checkout-form");
             if (!form) return;
@@ -1104,7 +1191,7 @@
                 var paymentInput  = form.querySelector('input[name="payment_method"]:checked');
                 var paymentMethod = paymentInput ? paymentInput.value : null;
 
-                // GA4 add_payment_info
+                window.dataLayer = window.dataLayer || [];
                 window.dataLayer.push({ ecommerce: null });
                 window.dataLayer.push({
                     event: "add_payment_info",
@@ -1117,7 +1204,6 @@
                     }
                 });
 
-                // Facebook Pixel: AddPaymentInfo
                 if (typeof fbq === "function" && items.length) {
                     fbq("track", "AddPaymentInfo", {
                         value: payableNow,

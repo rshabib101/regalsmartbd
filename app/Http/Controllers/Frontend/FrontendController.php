@@ -123,25 +123,25 @@ $brands = Brand::where('status', 1)
             ->limit(1)
             ->get();
 
-        // Flash sale – image + reviews eager load
+        // Flash sale – image + reviews + variantPrices eager load
         $flas_sales = Product::where(['status' => 1, 'approval_status' => 'approved', 'flashsale' => 1])
             ->orderBy('id', 'DESC')
             ->select('id', 'name', 'slug', 'new_price', 'old_price', 'sold', 'stock')
-            ->with(['prosizes', 'procolors', 'image', 'reviews'])
+            ->with(['prosizes', 'procolors', 'variantPrices.size', 'variantPrices.color', 'image', 'reviews'])
             ->limit(12)
             ->get();
 
-        // Hot deal top – image + reviews eager load
+        // Hot deal top – image + reviews + variantPrices eager load
         $hotdeal_top = Product::where(['status' => 1, 'approval_status' => 'approved', 'topsale' => 1])
             ->orderBy('id', 'DESC')
             ->select('id', 'name', 'slug', 'new_price', 'old_price', 'stock')
-            ->with(['prosizes', 'procolors', 'image', 'reviews'])
+            ->with(['prosizes', 'procolors', 'variantPrices.size', 'variantPrices.color', 'image', 'reviews'])
             ->limit(12)
             ->get();
 
         $hotdeal_bottom = Product::where(['status' => 1, 'approval_status' => 'approved', 'topsale' => 1])
             ->select('id', 'name', 'slug', 'new_price', 'old_price', 'stock')
-            ->with('image')
+            ->with(['image', 'prosizes', 'procolors', 'variantPrices.size', 'variantPrices.color', 'reviews'])
             ->skip(12)
             ->limit(12)
             ->get();
@@ -155,7 +155,7 @@ $brands = Brand::where('status', 1)
                         $q->select('id', 'name', 'slug', 'new_price', 'old_price', 'category_id')
                             ->where('status', 1)
                             ->where('approval_status', 'approved')
-                            ->with(['image', 'prosizes', 'procolors', 'reviews'])
+                            ->with(['image', 'prosizes', 'procolors', 'variantPrices.size', 'variantPrices.color', 'reviews'])
                             ->limit(12);
                     }
                 ])
@@ -179,7 +179,7 @@ $brands = Brand::where('status', 1)
             $all_products = Product::where(['status' => 1, 'approval_status' => 'approved'])
                 ->inRandomOrder()
                 ->select('id', 'name', 'slug', 'new_price', 'old_price', 'sold', 'stock')
-                ->with(['prosizes', 'procolors', 'image', 'reviews'])
+                ->with(['prosizes', 'procolors', 'variantPrices.size', 'variantPrices.color', 'image', 'reviews'])
                 ->limit(14)
                 ->get();
         } else {
@@ -450,7 +450,8 @@ $brands = Brand::where('status', 1)
     $products = Product::where('brand_id', $brand->id)
         ->where('status', 1)
         ->where('approval_status', 'approved')
-        ->select('id', 'name', 'slug', 'new_price', 'old_price', 'stock');
+        ->select('id', 'name', 'slug', 'new_price', 'old_price', 'stock')
+        ->with(['image', 'prosizes', 'procolors', 'variantPrices.size', 'variantPrices.color']);
 
     // sorting (same pattern as category/shop)
     if ($request->sort == 1) {
@@ -506,7 +507,7 @@ $brands = Brand::where('status', 1)
             ->where('status', 1)
             ->where('approval_status', 'approved')
             ->select('id', 'name', 'slug', 'new_price', 'old_price', 'stock', 'sold')
-            ->with(['image', 'reviews', 'prosizes', 'procolors']);
+            ->with(['image', 'reviews', 'prosizes', 'procolors', 'variantPrices.size', 'variantPrices.color']);
 
         // Sorting
         if ($request->sort == 1) {
@@ -748,7 +749,8 @@ $brands = Brand::where('status', 1)
         $category = Category::where(['slug' => $slug, 'status' => 1])->first();
 
         $products = Product::where(['status' => 1, 'approval_status' => 'approved', 'category_id' => $category->id])
-            ->select('id', 'name', 'slug', 'new_price', 'old_price', 'category_id','sold','stock');
+            ->select('id', 'name', 'slug', 'new_price', 'old_price', 'category_id','sold','stock')
+            ->with(['image', 'prosizes', 'procolors', 'variantPrices.size', 'variantPrices.color', 'reviews']);
         $subcategories = Subcategory::where('category_id', $category->id)->get();
 
         if ($request->sort == 1) {
@@ -790,7 +792,8 @@ $brands = Brand::where('status', 1)
         $soldShow = $request->sold=='show'?true:false;
         $subcategory = Subcategory::where(['slug' => $slug, 'status' => 1])->first();
         $products = Product::where(['status' => 1, 'approval_status' => 'approved', 'subcategory_id' => $subcategory->id])
-            ->select('id', 'name', 'slug', 'new_price', 'old_price', 'category_id', 'subcategory_id','sold','stock');
+            ->select('id', 'name', 'slug', 'new_price', 'old_price', 'category_id', 'subcategory_id','sold','stock')
+            ->with(['image', 'prosizes', 'procolors', 'variantPrices.size', 'variantPrices.color', 'reviews']);
         $childcategories = Childcategory::where('subcategory_id', $subcategory->id)->get();
 
         if ($request->sort == 1) {
@@ -839,7 +842,8 @@ $brands = Brand::where('status', 1)
         $childcategory = Childcategory::where(['slug' => $slug, 'status' => 1])->first();
         $childcategories = Childcategory::where('subcategory_id', $childcategory->subcategory_id)->get();
         $products = Product::where(['status' => 1, 'approval_status' => 'approved', 'childcategory_id' => $childcategory->id])->with('category')
-            ->select('id', 'name', 'slug', 'new_price', 'old_price', 'category_id', 'subcategory_id', 'childcategory_id','sold','stock');
+            ->select('id', 'name', 'slug', 'new_price', 'old_price', 'category_id', 'subcategory_id', 'childcategory_id','sold','stock')
+            ->with(['image', 'prosizes', 'procolors', 'variantPrices.size', 'variantPrices.color', 'reviews']);
 
         if ($request->sort == 1) {
             $products = $products->orderBy('created_at', 'desc');
@@ -944,15 +948,20 @@ $brands = Brand::where('status', 1)
 
     public function quickview(Request $request)
     {
-        $data['data'] = Product::where(['id' => $request->id, 'status' => 1, 'approval_status' => 'approved'])
-            ->with('images')
+        $product = Product::where(['id' => $request->id, 'status' => 1, 'approval_status' => 'approved'])
+            ->with(['image', 'images', 'category', 'brand', 'variantPrices.color', 'variantPrices.size', 'prosizes.size', 'procolors.color'])
             ->withCount('reviews')
             ->first();
 
-        $data = view('frontEnd.layouts.ajax.quickview', $data)->render();
-        if ($data != '') {
-            echo $data;
+        if (!$product) {
+            return '';
         }
+
+        $data['data'] = $product;
+        $data['action'] = $request->action ?? 'order_now';
+
+        $rendered = view('frontEnd.layouts.ajax.quickview', $data)->render();
+        return response($rendered);
     }
 
     public function livesearch(Request $request)

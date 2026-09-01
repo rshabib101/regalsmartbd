@@ -238,33 +238,44 @@
                                     <span>Invalid rating range</span>
                                 @endif
 
+                                @php
+                                    $cardPrice = ($value->variantPrices && $value->variantPrices->isNotEmpty() && $value->variantPrices->first()->price > 0)
+                                        ? $value->variantPrices->first()->price 
+                                        : $value->new_price;
+                                    $hasVariants = ($value->variantPrices && $value->variantPrices->isNotEmpty()) 
+                                        || ($value->prosizes && $value->prosizes->isNotEmpty()) 
+                                        || ($value->procolors && $value->procolors->isNotEmpty());
+                                @endphp
                                 <div class="pro_price">
                                     <p>
-                                        <del>৳ {{ $value->old_price }}</del>
-                                        ৳ {{ $value->new_price }}
+                                        @if ($value->old_price && $value->old_price > $cardPrice)
+                                            <del>৳ {{ $value->old_price }}</del>
+                                        @endif
+                                        ৳ {{ $cardPrice }}
                                     </p>
                                 </div>
 
-                                {{-- ✅ এখানে নতুন দুইটা বাটন লাগানো হলো --}}
-                                @if (!$value->prosizes->isEmpty() || !$value->procolors->isEmpty())
-                                    {{-- ভ্যারিয়েন্ট আছে → Details পেজে নেবে --}}
+                                {{-- বাটন লজিক: স্টক আউট / ভ্যারিয়েন্ট মডাল / ডাইরেক্ট কার্ট --}}
+                                @if (!is_null($value->stock) && $value->stock < 1)
                                     <div class="pro_btn">
-                                        {{-- বড় অর্ডার বাটন --}}
-                                        <a href="{{ route('product', $value->slug) }}"
-                                           class="order-btn-link order-btn">
-                                            অর্ডার করুন
+                                        <a href="{{ route('product', $value->slug) }}" class="order-btn-link order-btn">
+                                            স্টক আউট
                                         </a>
-
-                                        {{-- ছোট কার্ট আইকন বাটন --}}
-                                        <a href="{{ route('product', $value->slug) }}"
-                                           class="cart-icon-link cart-icon-btn">
+                                        <a href="{{ route('product', $value->slug) }}" class="cart-icon-link cart-icon-btn">
                                             <i class="fa-solid fa-cart-shopping"></i>
                                         </a>
                                     </div>
-                                @else
-                                    {{-- ভ্যারিয়েন্ট নেই → সরাসরি কার্ট + অর্ডার --}}
+                                @elseif ($hasVariants)
                                     <div class="pro_btn">
-
+                                        <button type="button" class="order-btn open-variant-modal" data-id="{{ $value->id }}" data-action="order_now">
+                                            অর্ডার করুন
+                                        </button>
+                                        <button type="button" class="cart-icon-btn open-variant-modal" data-id="{{ $value->id }}" data-action="add_cart">
+                                            <i class="fa-solid fa-cart-shopping"></i>
+                                        </button>
+                                    </div>
+                                @else
+                                    <div class="pro_btn">
                                         {{-- Order Now --}}
                                         <form action="{{ route('cart.store') }}" method="POST" class="ajax-cart-form">
                                             @csrf
@@ -281,11 +292,10 @@
                                             @csrf
                                             <input type="hidden" name="id" value="{{ $value->id }}">
                                             <input type="hidden" name="qty" value="1">
-                                            <button type="submit" class="cart-icon-btn">
+                                             <button type="submit" class="cart-icon-btn">
                                                 <i class="fa-solid fa-cart-shopping"></i>
                                             </button>
                                         </form>
-
                                     </div>
                                 @endif
                             </div>

@@ -173,25 +173,41 @@
                             @endfor
                         @endif
 
+                        @php
+                            $cardPrice = ($value->variantPrices && $value->variantPrices->isNotEmpty() && $value->variantPrices->first()->price > 0)
+                                ? $value->variantPrices->first()->price 
+                                : $value->new_price;
+                            $hasVariants = ($value->variantPrices && $value->variantPrices->isNotEmpty()) 
+                                || ($value->prosizes && $value->prosizes->isNotEmpty()) 
+                                || ($value->procolors && $value->procolors->isNotEmpty());
+                        @endphp
                         <div class="pro_price">
                             <p>
-                                @if($value->old_price)
+                                @if($value->old_price && $value->old_price > $cardPrice)
                                     <del>৳ {{ $value->old_price }}</del>
                                 @endif
-                                ৳ {{ $value->new_price }}
+                                ৳ {{ $cardPrice }}
                             </p>
                         </div>
 
-                        {{-- Order and Cart Buttons --}}
-                        @if (!$value->prosizes->isEmpty() || !$value->procolors->isEmpty())
-                            {{-- Variant product – go to detail page --}}
+                        {{-- বাটন লজিক: স্টক আউট / ভ্যারিয়েন্ট মডাল / ডাইরেক্ট কার্ট --}}
+                        @if (!is_null($value->stock) && $value->stock < 1)
                             <div class="pro_btn">
                                 <a href="{{ route('product', $value->slug) }}" class="order-btn-link">
-                                    অর্ডার করুন
+                                    স্টক আউট
                                 </a>
                                 <a href="{{ route('product', $value->slug) }}" class="cart-icon-link">
                                     <i class="fa-solid fa-cart-shopping"></i>
                                 </a>
+                            </div>
+                        @elseif ($hasVariants)
+                            <div class="pro_btn">
+                                <button type="button" class="order-btn open-variant-modal" data-id="{{ $value->id }}" data-action="order_now">
+                                    অর্ডার করুন
+                                </button>
+                                <button type="button" class="cart-icon-btn open-variant-modal" data-id="{{ $value->id }}" data-action="add_cart">
+                                    <i class="fa-solid fa-cart-shopping"></i>
+                                </button>
                             </div>
                         @else
                             {{-- Simple product --}}
