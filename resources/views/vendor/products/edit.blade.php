@@ -207,11 +207,14 @@
                     <div class="card-body">
                         <div class="d-flex flex-wrap gap-2 mb-4">
                             @foreach($edit_data->images->filter(fn($img) => !$img->color_id && !$img->size_id) as $image)
-                            <div class="edit-image-container">
+                            <div class="edit-image-container existing-gallery-img-wrap" data-img-id="{{ $image->id }}">
                                 <img src="{{asset($image->image)}}" class="edit-image" alt="Product Image">
-                                <a href="{{route('vendor.products.image.destroy',['id'=>$image->id])}}" class="btn-remove-image-db" onclick="return confirm('Are you sure you want to delete this image?')">
+                                <button type="button" class="btn-remove-image-db delete-gallery-img-btn"
+                                        data-url="{{route('vendor.products.image.destroy',['id'=>$image->id])}}"
+                                        data-img-id="{{$image->id}}"
+                                        title="Delete this image">
                                     <i class="fas fa-times"></i>
-                                </a>
+                                </button>
                             </div>
                             @endforeach
                         </div>
@@ -249,130 +252,158 @@
 
                 <div class="card" id="variant_section">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>Product Variants <small class="text-muted">(Optional)</small></span>
-                        <button type="button" class="btn btn-sm btn-success add-variant rounded-pill px-3"><i class="fa fa-plus me-1"></i> Add Variant</button>
+                        <span>Product Variants <small class="text-muted">(Color & Size)</small></span>
+                        <button type="button" class="btn btn-sm btn-success add-variant-btn rounded-pill px-3 shadow-sm"><i class="fa fa-plus me-1"></i> Add Variant</button>
                     </div>
                     <div class="card-body">
-                        <div id="variant-wrapper">
-                            @forelse($groupedVariants ?? [] as $key => $variant)
-                            <div class="variant-item variant-card">
-                                <div class="row g-2 align-items-end">
-                                    <div class="col-md-3">
-                                        <label class="form-label small">Color <small class="text-muted">(Optional)</small></label>
-                                        <select name="variant_price[{{ $key }}][color_id]" class="form-control select2 variant-color-select">
-                                            <option value="">Select Color (Optional)</option>
-                                            @foreach($totalcolors as $color)
-                                            <option value="{{ $color->id }}" {{ ($variant['color_id'] ?? null) == $color->id ? 'selected' : '' }}>
-                                                {{ $color->colorName ?? $color->name }}
-                                            </option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label small">Size <small class="text-muted">(Optional)</small></label>
-                                        <select name="variant_price[{{ $key }}][size_id][]" class="form-control select2 variant-size-select" multiple>
-                                            @foreach($totalsizes as $size)
-                                            <option value="{{ $size->id }}" {{ in_array($size->id, $variant['size_ids'] ?? []) ? 'selected' : '' }}>
-                                                {{ $size->sizeName ?? $size->name }}
-                                            </option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="col-md-2">
-                                        <label class="form-label small">Price</label>
-                                        <input type="number" step="0.01" name="variant_price[{{ $key }}][price]" value="{{ $variant['price'] ?? 0 }}" class="form-control variant-price-input" placeholder="0.00">
-                                    </div>
-                                    <div class="col-md-2">
-                                        <label class="form-label small">Stock</label>
-                                        <input type="number" name="variant_price[{{ $key }}][stock]" value="{{ $variant['stock'] ?? 0 }}" class="form-control variant-stock-input" placeholder="Qty">
-                                    </div>
-                                    <div class="col-md-2">
-                                        <label class="form-label small">Variant Image</label>
-                                        @php
-                                            $vColorId = $variant['color_id'] ?? null;
-                                            $vSizeIds = $variant['size_ids'] ?? [];
-                                            $vVariantImages = $edit_data->images->filter(function($img) use ($vColorId, $vSizeIds) {
-                                                $colorMatch = ($img->color_id == $vColorId) || (empty($img->color_id) && empty($vColorId));
-                                                $sizeMatch = empty($vSizeIds) ? empty($img->size_id) : in_array($img->size_id, $vSizeIds);
-                                                return $colorMatch && $sizeMatch;
-                                            })->unique('image');
-                                        @endphp
-                                        @if($vVariantImages->isNotEmpty())
-                                            <div class="variant-existing-imgs d-flex flex-wrap gap-1 mb-2">
-                                                @foreach($vVariantImages as $vImg)
-                                                    <div class="position-relative">
-                                                        <img src="{{ asset($vImg->image) }}" class="rounded border" style="width:50px;height:50px;object-fit:cover;" alt="">
-                                                        <a href="{{ route('vendor.products.image.destroy', ['id' => $vImg->id]) }}" class="btn btn-xs btn-danger position-absolute top-0 end-0 rounded-circle" style="padding:0 4px;top:-4px;right:-4px;" onclick="return confirm('Delete this image?')"><i class="fa fa-times"></i></a>
+                        <p class="text-muted font-13 mb-3">
+                            প্রত্যেকটি ভ্যারিয়েন্টের জন্য আলাদা সাইজ, কালার, মূল্য, স্টক এবং ছবি নির্ধারণ করতে পারেন।
+                        </p>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-centered mb-0" id="variant-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="min-width: 140px;">Color</th>
+                                        <th style="min-width: 140px;">Size</th>
+                                        <th style="min-width: 110px;">Price *</th>
+                                        <th style="min-width: 90px;">Stock *</th>
+                                        <th style="min-width: 110px;">SKU</th>
+                                        <th style="min-width: 180px;">Variant Image</th>
+                                        <th style="width: 50px;" class="text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="variant-tbody">
+                                    @php $vRowIdx = 0; @endphp
+                                    @forelse($edit_data->variantPrices as $vp)
+                                        <tr class="variant-row" data-row="{{ $vRowIdx }}">
+                                            <td>
+                                                <select name="variant_price[{{ $vRowIdx }}][color_id]" class="form-control form-select variant-color-select">
+                                                    <option value="">No Color</option>
+                                                    @foreach($totalcolors as $color)
+                                                        <option value="{{ $color->id }}" {{ $vp->color_id == $color->id ? 'selected' : '' }}>
+                                                            {{ $color->colorName ?? $color->name }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <select name="variant_price[{{ $vRowIdx }}][size_id]" class="form-control form-select variant-size-select">
+                                                    <option value="">No Size</option>
+                                                    @foreach($totalsizes as $size)
+                                                        <option value="{{ $size->id }}" {{ $vp->size_id == $size->id ? 'selected' : '' }}>
+                                                            {{ $size->sizeName ?? $size->name }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <input type="number" step="0.01" min="0" name="variant_price[{{ $vRowIdx }}][price]"
+                                                       value="{{ $vp->price }}" class="form-control form-control-sm variant-price-input" placeholder="Price">
+                                            </td>
+                                            <td>
+                                                <input type="number" min="0" name="variant_price[{{ $vRowIdx }}][stock]"
+                                                       value="{{ $vp->stock }}" class="form-control form-control-sm" placeholder="Stock">
+                                            </td>
+                                            <td>
+                                                <input type="text" name="variant_price[{{ $vRowIdx }}][sku]"
+                                                       value="{{ $vp->sku }}" class="form-control form-control-sm" placeholder="SKU">
+                                            </td>
+                                            <td>
+                                                @php
+                                                    $matchedImg = $edit_data->images->first(function($im) use ($vp) {
+                                                        if ($vp->color_id && $vp->size_id) {
+                                                            return $im->color_id == $vp->color_id && $im->size_id == $vp->size_id;
+                                                        }
+                                                        if ($vp->size_id) {
+                                                            return $im->size_id == $vp->size_id;
+                                                        }
+                                                        if ($vp->color_id) {
+                                                            return $im->color_id == $vp->color_id;
+                                                        }
+                                                        return false;
+                                                    });
+                                                @endphp
+                                                <div class="d-flex align-items-center gap-2">
+                                                    @if($matchedImg)
+                                                        <div class="position-relative d-inline-block existing-variant-img-wrap" data-img-id="{{ $matchedImg->id }}">
+                                                            <img src="{{ asset($matchedImg->image) }}" class="rounded border" style="width:38px;height:38px;object-fit:cover;" alt="Variant">
+                                                            <button type="button" class="btn btn-xs btn-danger position-absolute top-0 end-0 rounded-circle delete-variant-img-btn"
+                                                               style="padding:0 3px; font-size:10px; line-height:13px; top:-4px; right:-4px;"
+                                                               data-url="{{ route('vendor.products.image.destroy', ['id' => $matchedImg->id]) }}"
+                                                               data-img-id="{{ $matchedImg->id }}"
+                                                               title="Delete Image">×</button>
+                                                        </div>
+                                                    @endif
+                                                    <div class="flex-grow-1">
+                                                        <input type="file" name="variant_image[{{ $vRowIdx }}][image]" class="form-control form-control-sm variant-img-input" accept="image/*">
+                                                        <div class="variant-img-preview mt-1" style="display:none;">
+                                                            <img src="" alt="Preview" class="rounded border" style="max-width:38px;max-height:38px;object-fit:cover;">
+                                                            <button type="button" class="btn btn-xs btn-outline-danger variant-img-clear ms-1 py-0 px-1"><i class="fa fa-times"></i></button>
+                                                        </div>
                                                     </div>
-                                                @endforeach
-                                            </div>
-                                        @endif
-                                        <div class="variant-img-upload">
-                                            <input type="file" name="variant_image[{{ $key }}][image]" class="form-control form-control-sm variant-img-input" accept="image/*">
-                                            <div class="variant-img-preview mt-1" style="display:none;">
-                                                <img src="" alt="Preview" class="rounded border" style="max-width:60px;max-height:60px;object-fit:cover;">
-                                                <button type="button" class="btn btn-sm btn-danger variant-img-clear ms-1" title="Remove"><i class="fa fa-times"></i></button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-1">
-                                        @if($loop->first)
-                                            <button type="button" class="btn btn-danger btn-remove-row d-none w-100"><i class="fa fa-trash"></i></button>
-                                        @else
-                                            <button type="button" class="btn btn-danger btn-remove-row w-100"><i class="fa fa-trash"></i></button>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-                            @empty
-                            <div class="variant-item variant-card">
-                                <div class="row g-2 align-items-end">
-                                    <div class="col-md-3">
-                                        <label class="form-label small">Color <small class="text-muted">(Optional)</small></label>
-                                        <select name="variant_price[0][color_id]" class="form-control select2 variant-color-select">
-                                            <option value="">Select Color (Optional)</option>
-                                            @foreach($totalcolors as $color)
-                                            <option value="{{ $color->id }}">{{ $color->colorName ?? $color->name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label small">Size <small class="text-muted">(Optional)</small></label>
-                                        <select name="variant_price[0][size_id][]" class="form-control select2 variant-size-select" multiple>
-                                            @foreach($totalsizes as $size)
-                                            <option value="{{ $size->id }}">{{ $size->sizeName ?? $size->name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="col-md-2">
-                                        <label class="form-label small">Price</label>
-                                        <input type="number" step="0.01" name="variant_price[0][price]" class="form-control variant-price-input" placeholder="0.00">
-                                    </div>
-                                    <div class="col-md-2">
-                                        <label class="form-label small">Stock</label>
-                                        <input type="number" name="variant_price[0][stock]" class="form-control variant-stock-input" placeholder="Qty">
-                                    </div>
-                                    <div class="col-md-2">
-                                        <label class="form-label small">Variant Image</label>
-                                        <div class="variant-img-upload">
-                                            <input type="file" name="variant_image[0][image]" class="form-control form-control-sm variant-img-input" accept="image/*">
-                                            <div class="variant-img-preview mt-1" style="display:none;">
-                                                <img src="" alt="Preview" class="rounded border" style="max-width:60px;max-height:60px;object-fit:cover;">
-                                                <button type="button" class="btn btn-sm btn-danger variant-img-clear ms-1" title="Remove"><i class="fa fa-times"></i></button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-1">
-                                        <button type="button" class="btn btn-danger btn-remove-row d-none w-100"><i class="fa fa-trash"></i></button>
-                                    </div>
-                                </div>
-                                <div class="mt-2 text-muted small">
-                                    <i class="fa fa-info-circle me-1"></i> Variants are optional. You can skip this section if your product doesn't have size/color variations.
-                                </div>
-                            </div>
-                            @endforelse
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <button type="button" class="btn btn-sm btn-outline-danger remove-variant-btn" title="Remove variant">
+                                                    <i class="fa fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        @php $vRowIdx++; @endphp
+                                    @empty
+                                    @endforelse
+                                </tbody>
+                            </table>
                         </div>
+
+                        {{-- Hidden Template for Dynamic Row Addition --}}
+                        <template id="variant-row-template">
+                            <tr class="variant-row" data-row="__INDEX__">
+                                <td>
+                                    <select name="variant_price[__INDEX__][color_id]" class="form-control form-select variant-color-select">
+                                        <option value="">No Color</option>
+                                        @foreach($totalcolors as $color)
+                                            <option value="{{ $color->id }}">{{ $color->colorName ?? $color->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="variant_price[__INDEX__][size_id]" class="form-control form-select variant-size-select">
+                                        <option value="">No Size</option>
+                                        @foreach($totalsizes as $size)
+                                            <option value="{{ $size->id }}">{{ $size->sizeName ?? $size->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="number" step="0.01" min="0" name="variant_price[__INDEX__][price]"
+                                           class="form-control form-control-sm variant-price-input" placeholder="Price">
+                                </td>
+                                <td>
+                                    <input type="number" min="0" name="variant_price[__INDEX__][stock]"
+                                           value="100" class="form-control form-control-sm" placeholder="Stock">
+                                </td>
+                                <td>
+                                    <input type="text" name="variant_price[__INDEX__][sku]"
+                                           class="form-control form-control-sm" placeholder="SKU">
+                                </td>
+                                <td>
+                                    <input type="file" name="variant_image[__INDEX__][image]" class="form-control form-control-sm variant-img-input" accept="image/*">
+                                    <div class="variant-img-preview mt-1" style="display:none;">
+                                        <img src="" alt="Preview" class="rounded border" style="max-width:38px;max-height:38px;object-fit:cover;">
+                                        <button type="button" class="btn btn-xs btn-outline-danger variant-img-clear ms-1 py-0 px-1"><i class="fa fa-times"></i></button>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-outline-danger remove-variant-btn" title="Remove variant">
+                                        <i class="fa fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
                     </div>
+                </div>
                 </div>
 
                 <div class="card">
@@ -744,59 +775,62 @@
             $(this).closest(".control-group").remove();
         });
 
-        // Select2 for Variants
-        $('.variant-size-select').select2({ multiple: true, width: '100%' });
-        $('.variant-color-select').select2({ width: '100%' });
+        // Dynamic Variant Add/Remove
+        let currentVariantIndex = {{ $vRowIdx }};
 
-        // Dynamic Variant Add
-        let variantIndex = {{ count($groupedVariants ?? []) > 0 ? count($groupedVariants) : 1 }};
-        
-        $(".add-variant").click(function () {
-            let wrapper = $("#variant-wrapper");
-            let firstRow = wrapper.find('.variant-item').first().clone();
-            
-            // Cleanup cloned row
-            firstRow.find('.select2-container').remove();
-            firstRow.find('.variant-existing-imgs').remove();
-            firstRow.find('input').val('');
-            
-            firstRow.find('select, input').each(function(){
-                let oldName = $(this).attr('name');
-                if (oldName) {
-                    if (oldName.includes('[size_id][]')) {
-                        $(this).attr('name', 'variant_price[' + variantIndex + '][size_id][]');
-                    } else if (oldName.includes('variant_image')) {
-                        $(this).attr('name', 'variant_image[' + variantIndex + '][image]');
-                    } else {
-                        $(this).attr('name', oldName.replace(/\[\d+\]/, '[' + variantIndex + ']'));
-                    }
-                }
-                if ($(this).attr('type') === 'file') {
-                    $(this).val('');
-                    $(this).siblings('.variant-img-preview').hide().find('img').attr('src', '');
-                } else $(this).val(null).trigger('change');
-            });
-
-            // Show remove button
-            firstRow.find('.btn-remove-row').removeClass('d-none');
-            
-            wrapper.append(firstRow);
-            
-            // Re-init Select2
-            setTimeout(() => {
-                firstRow.find('.variant-size-select').select2({ multiple: true, width: '100%' });
-                firstRow.find('.variant-color-select').select2({ width: '100%' });
-            }, 100);
-            
-            variantIndex++;
+        $(document).on('click', '.add-variant-btn', function() {
+            let template = document.getElementById('variant-row-template').innerHTML;
+            let newRowHtml = template.replace(/__INDEX__/g, currentVariantIndex);
+            $('#variant-tbody').append(newRowHtml);
+            currentVariantIndex++;
         });
 
-        $("body").on("click", ".btn-remove-row", function () {
-            $(this).closest(".variant-item").remove();
+        // Instant AJAX delete for variant images and gallery images
+        $(document).on('click', '.delete-variant-img-btn, .delete-gallery-img-btn', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!confirm('Are you sure you want to delete this image?')) return;
+            var $btn = $(this);
+            var $wrap = $btn.closest('.existing-variant-img-wrap, .existing-gallery-img-wrap');
+            var url = $btn.data('url');
+            var imgId = $btn.data('img-id');
+
+            $btn.prop('disabled', true).html('...');
+
+            $.ajax({
+                url: url,
+                type: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                success: function(res) {
+                    $wrap.fadeOut(250, function() { $(this).remove(); });
+                    if (typeof toastr !== 'undefined') {
+                        toastr.success('Image deleted successfully!');
+                    }
+                },
+                error: function() {
+                    $('<input>').attr({type: 'hidden', name: 'deleted_image_ids[]', value: imgId}).appendTo('form');
+                    $wrap.fadeOut(250, function() { $(this).remove(); });
+                    if (typeof toastr !== 'undefined') {
+                        toastr.info('Image marked for deletion on submit.');
+                    }
+                }
+            });
+        });
+
+        $(document).on('click', '.remove-variant-btn', function() {
+            var $row = $(this).closest('tr.variant-row');
+            var $existingImg = $row.find('.existing-variant-img-wrap');
+            if ($existingImg.length) {
+                var imgId = $existingImg.data('img-id');
+                if (imgId) {
+                    $('<input>').attr({type: 'hidden', name: 'deleted_image_ids[]', value: imgId}).appendTo('form');
+                }
+            }
+            $row.remove();
         });
 
         // Variant Image Preview & Clear
-        $("body").on("change", ".variant-img-input", function() {
+        $(document).on('change', '.variant-img-input', function() {
             var $input = $(this);
             var $preview = $input.siblings(".variant-img-preview");
             var $img = $preview.find("img");
@@ -805,9 +839,13 @@
                 var reader = new FileReader();
                 reader.onload = function(e) { $img.attr("src", e.target.result); $preview.show(); };
                 reader.readAsDataURL(file);
-            } else { $preview.hide(); $img.attr("src", ""); }
+            } else {
+                $preview.hide();
+                $img.attr("src", "");
+            }
         });
-        $("body").on("click", ".variant-img-clear", function() {
+
+        $(document).on('click', '.variant-img-clear', function() {
             var $preview = $(this).closest(".variant-img-preview");
             $preview.siblings(".variant-img-input").val("");
             $preview.find("img").attr("src", "");
@@ -815,50 +853,13 @@
         });
 
         // Auto-sync 1st variant price with New Price input
-        $(document).on('input', 'input[name*="variant_price"][name*="[price]"]', function() {
-            let firstPrice = $('input[name*="variant_price"][name*="[price]"]').filter(function() { return $(this).val(); }).first().val();
+        $(document).on('input', '.variant-price-input', function() {
+            let firstPrice = $('.variant-price-input').filter(function() { return $(this).val(); }).first().val();
             let $newPrice = $('input[name="new_price"]');
             if (firstPrice && (!$newPrice.val() || $newPrice.data('auto-synced'))) {
                 $newPrice.val(firstPrice).data('auto-synced', true);
             }
-        });
-
-        // Form Submit Handler - expand sizes, add image_row, keep variant_image files
-        $('form[data-parsley-validate]').on('submit', function(e) {
-            let variantData = [];
-            let vIdx = 0;
-            
-            $('#variant-wrapper .variant-item').each(function() {
-                let $row = $(this);
-                let colorId = $row.find('.variant-color-select').val();
-                let selectedSizes = $row.find('.variant-size-select').val() || [];
-                let price = $row.find('input[name*="[price]"]').val();
-                let stock = $row.find('input[name*="[stock]"]').val();
-
-                let rowIdx = $('#variant-wrapper .variant-item').index($row);
-                $row.find('.variant-img-input').attr('name', 'variant_image[' + rowIdx + '][image]');
-
-                // Skip if no color, no size, no price, and no stock (completely empty variant)
-                if (!colorId && selectedSizes.length === 0 && !price && !stock) {
-                    return;
-                }
-                if (selectedSizes.length > 0) {
-                    selectedSizes.forEach(function(sizeId) {
-                        variantData.push({ idx: vIdx++, c: colorId || null, s: sizeId, p: price || 0, st: stock || 0, row: rowIdx });
-                    });
-                } else {
-                    variantData.push({ idx: vIdx++, c: colorId || null, s: null, p: price || 0, st: stock || 0, row: rowIdx });
-                }
-            });
-
-            $(this).find('input[name*="variant_price"]:not([type="file"]), select[name*="variant_price"]').remove();
-            if (variantData.length > 0) {
-                variantData.forEach(function(v) {
-                    $('<input>').attr({type:'hidden', name:`variant_price[${v.idx}][color_id]`, value:v.c || ''}).appendTo('form');
-                    $('<input>').attr({type:'hidden', name:`variant_price[${v.idx}][size_id]`, value:v.s || ''}).appendTo('form');
-                    $('<input>').attr({type:'hidden', name:`variant_price[${v.idx}][price]`, value:v.p}).appendTo('form');
-                    $('<input>').attr({type:'hidden', name:`variant_price[${v.idx}][stock]`, value:v.st}).appendTo('form');
-                    $('<input>').attr({type:'hidden', name:`variant_price[${v.idx}][image_row]`, value:v.row}).appendTo('form');
+        });<input>').attr({type:'hidden', name:`variant_price[${v.idx}][image_row]`, value:v.row}).appendTo('form');
                 });
             }
         });

@@ -22,6 +22,7 @@ use Illuminate\Support\Str;
 use DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Cache;
+use App\Services\ImageOptimizerService;
 
 class ProductController extends Controller
 {
@@ -249,6 +250,11 @@ class ProductController extends Controller
             $input['download_expire_days']= null;
         }
 
+        // Filter input to only columns that exist in the products table
+        $columns = \Illuminate\Support\Facades\Schema::getColumnListing('products');
+        $input = array_intersect_key($input, array_flip($columns));
+        unset($input['id']);
+
         // CREATE PRODUCT
         $product = Product::create($input);
 
@@ -260,22 +266,18 @@ class ProductController extends Controller
             $product->colors()->attach($request->proColor);
         }
 
-        // PRODUCT IMAGES (with optional color/size per image)
+        // PRODUCT IMAGES (Optimized to WebP with max 1200px)
         if ($request->hasFile('image')) {
             $imageColors = $request->image_color ?? [];
             $imageSizes  = $request->image_size ?? [];
             foreach ($request->file('image') as $idx => $img) {
-                $name = time().'-'.$img->getClientOriginalName();
-                $name = strtolower(preg_replace('/\s+/', '-', $name));
-                $path = 'public/uploads/product/';
-                $img->move($path, $name);
-
-                $colorId = $imageColors[$idx] ?? null;
-                $sizeId  = $imageSizes[$idx] ?? null;
+                $savedPath = ImageOptimizerService::uploadProductImage($img, 'public/uploads/product/', 'prod');
+                $colorId   = $imageColors[$idx] ?? null;
+                $sizeId    = $imageSizes[$idx] ?? null;
 
                 Productimage::create([
                     'product_id' => $product->id,
-                    'image'      => $path.$name,
+                    'image'      => $savedPath,
                     'color_id'   => $colorId ?: null,
                     'size_id'    => $sizeId ?: null,
                 ]);
@@ -287,21 +289,49 @@ class ProductController extends Controller
             }
         }
 
-        // VARIANT PRICES
+        // VARIANT PRICES & VARIANT IMAGES
+        $collectedColors = [];
+        $collectedSizes  = [];
         if ($request->variant_price && is_array($request->variant_price)) {
-            foreach ($request->variant_price as $variant) {
-                // Skip if neither color nor size is selected
-                if (empty($variant['color_id']) && empty($variant['size_id'])) {
+            foreach ($request->variant_price as $idx => $variant) {
+                $colorId = !empty($variant['color_id']) ? (int)$variant['color_id'] : null;
+                $sizeId  = !empty($variant['size_id'])  ? (int)$variant['size_id']  : null;
+                $price   = isset($variant['price']) && $variant['price'] !== '' ? (float)$variant['price'] : 0;
+                $stock   = isset($variant['stock']) && $variant['stock'] !== '' ? (int)$variant['stock'] : 0;
+                $sku     = !empty($variant['sku']) ? trim($variant['sku']) : null;
+
+                // Skip completely empty rows
+                if (!$colorId && !$sizeId && $price <= 0 && $stock <= 0) {
                     continue;
                 }
-                
+
                 ProductVariantPrice::create([
                     'product_id' => $product->id,
-                    'color_id'   => $variant['color_id'] ?? null,
-                    'size_id'    => $variant['size_id'] ?? null,
-                    'price'      => $variant['price'] ?? 0,
-                    'stock'      => $variant['stock'] ?? 0,
+                    'color_id'   => $colorId,
+                    'size_id'    => $sizeId,
+                    'price'      => $price,
+                    'stock'      => $stock,
+                    'sku'        => $sku,
                 ]);
+
+                if ($colorId) $collectedColors[] = $colorId;
+                if ($sizeId)  $collectedSizes[]  = $sizeId;
+
+                if ($firstVariantPrice === null && $price > 0) {
+                    $firstVariantPrice = $price;
+                }
+
+                // Check variant image upload
+                $varImgFile = $request->file("variant_image.{$idx}.image") ?: $request->file("variant_price.{$idx}.image");
+                if ($varImgFile && ($colorId || $sizeId)) {
+                    $savedPath = ImageOptimizerService::uploadProductImage($varImgFile, 'public/uploads/product/', 'var');
+                    Productimage::create([
+                        'product_id' => $product->id,
+                        'image'      => $savedPath,
+                        'color_id'   => $colorId,
+                        'size_id'    => $sizeId,
+                    ]);
+                }
             }
 
             if ($firstVariantPrice !== null) {
@@ -309,34 +339,12 @@ class ProductController extends Controller
             }
         }
 
-        // VARIANT IMAGES (from Product Variants - variant_image[row_index][image], image_row links to row)
-        if ($request->variant_price && is_array($request->variant_price)) {
-            $savedFiles = [];
-            $doneKeys = [];
-            foreach ($request->variant_price as $idx => $vp) {
-                $imageRow = $vp['image_row'] ?? $idx;
-                $colorId = $vp['color_id'] ?? null;
-                $sizeId = $vp['size_id'] ?? null;
-                if (!$colorId && !$sizeId) continue;
-                $file = $request->file("variant_image.{$imageRow}.image");
-                if (!$file) continue;
-                $key = ($colorId ?: '0') . '_' . ($sizeId ?: '0');
-                if (isset($doneKeys[$key])) continue;
-                $doneKeys[$key] = true;
-                if (!isset($savedFiles[$imageRow])) {
-                    $name = time().'-'.uniqid().'-'.$file->getClientOriginalName();
-                    $name = strtolower(preg_replace('/\s+/', '-', $name));
-                    $path = 'public/uploads/product/';
-                    $file->move($path, $name);
-                    $savedFiles[$imageRow] = $path.$name;
-                }
-                Productimage::create([
-                    'product_id' => $product->id,
-                    'image'      => $savedFiles[$imageRow],
-                    'color_id'   => $colorId ?: null,
-                    'size_id'    => $sizeId ?: null,
-                ]);
-            }
+        // Auto-sync product sizes and colors
+        if (!empty($collectedSizes)) {
+            $product->sizes()->sync(array_unique($collectedSizes));
+        }
+        if (!empty($collectedColors)) {
+            $product->colors()->sync(array_unique($collectedColors));
         }
 
         // WHOLESALE PRICING TIERS
@@ -385,18 +393,20 @@ class ProductController extends Controller
     // ================================
     public function edit($id)
     {
-        $edit = Product::with(['images.color','images.size','variantPrices'])->findOrFail($id);
+        $edit = Product::with(['images.color','images.size','variantPrices.color','variantPrices.size'])->findOrFail($id);
 
         return view('backEnd.product.edit', [
-            'edit_data'     => $edit,
-            'categories'    => Category::where('parent_id', 0)->where('status', 1)->with('childrenCategories')->get(),
-            'subcategory'   => Subcategory::where('category_id', $edit->category_id)->get(),
-            'childcategory' => Childcategory::where('subcategory_id', $edit->subcategory_id)->get(),
-            'brands'        => Brand::where('status', 1)->get(),
-            'totalsizes'    => Size::where('status', 1)->get(),
-            'totalcolors'   => Color::where('status', 1)->get(),
-            'selectcolors'  => Productcolor::where('product_id', $id)->get(),
-            'selectsizes'   => Productsize::where('product_id', $id)->get(),
+            'edit_data'       => $edit,
+            'categories'      => Category::where('parent_id', 0)->where('status', 1)->with('childrenCategories')->get(),
+            'subcategory'     => Subcategory::where('category_id', $edit->category_id)->get(),
+            'childcategory'   => Childcategory::where('subcategory_id', $edit->subcategory_id)->get(),
+            'brands'          => Brand::where('status', 1)->get(),
+            'totalsizes'      => Size::where('status', 1)->get(),
+            'totalcolors'     => Color::where('status', 1)->get(),
+            'sizes'           => Size::where('status', 1)->get(),
+            'colors'          => Color::where('status', 1)->get(),
+            'selectcolors'    => Productcolor::where('product_id', $id)->get(),
+            'selectsizes'     => Productsize::where('product_id', $id)->get(),
             'wholesalePrices' => \App\Models\ProductWholesalePrice::where('product_id', $id)->get(),
         ]);
     }
@@ -429,44 +439,16 @@ class ProductController extends Controller
         ]);
 
         $product = Product::findOrFail($request->id);
+        $input = $request->except(['image','proColor','proSize','variant_price','variant_image','wholesale_price','digital_file','pro_video_file']);
 
-        $input = $request->except([
-            'image',
-            'image_color',
-            'image_size',
-            'meta_image',
-            'variant_price',
-            'variant_image',
-            'wholesale_price',
-            'digital_file',
-            'proSize',
-            'proColor',
-            'pro_video_source',
-            'pro_video_file',
-        ]);
+        $input['slug']         = Str::slug($request->name);
+        $input['status']       = $request->status ? 1 : 0;
+        $input['topsale']      = $request->topsale ? 1 : 0;
+        $input['feature_product'] = $request->feature_product ? 1 : 0;
+        $input['is_wholesale'] = $request->is_wholesale ? 1 : 0;
+        $input['in_facebook_catalog'] = $request->in_facebook_catalog ? 1 : 0;
 
-        foreach ($input as $key => $val) {
-            if (is_array($val)) {
-                $allScalar = !array_filter($val, 'is_array');
-                if ($allScalar) {
-                    $input[$key] = implode(',', $val);
-                } else {
-                    unset($input[$key]);
-                }
-            }
-        }
-
-        // PRODUCT TYPE
-        $isDigital = $request->product_type === 'digital';
-        $input['is_digital'] = $isDigital ? 1 : 0;
-
-        if ($isDigital) {
-            $input['advance_amount'] = 0;
-        } else {
-            $input['advance_amount'] = $request->advance_amount ?? 0;
-        }
-
-        // Price & stock optional – আপডেটে না দিলে ০ ধরা হবে
+        // Auto-sync new_price from first variant if available
         $firstVariantPrice = null;
         if ($request->variant_price && is_array($request->variant_price)) {
             foreach ($request->variant_price as $vp) {
@@ -476,58 +458,27 @@ class ProductController extends Controller
                 }
             }
         }
-        $input['new_price']      = $request->filled('new_price') ? $request->new_price : ($firstVariantPrice ?? 0);
-        $input['purchase_price'] = $request->filled('purchase_price') ? $request->purchase_price : 0;
-        $input['stock']          = $request->filled('stock') ? (int) $request->stock : 0;
-
-        // Slug & flags
-        $input['slug']            = strtolower(preg_replace('/[\/\s]+/', '-', $request->name.'-'.$product->id));
-        $input['status']               = $request->status ? 1 : 0;
-        $input['topsale']              = $request->topsale ? 1 : 0;
-        $input['free_delivery']        = $request->free_delivery ? 1 : 0;
-        $input['feature_product']      = $request->feature_product ? 1 : 0;
-        $input['in_facebook_catalog']  = $request->has('in_facebook_catalog') ? 1 : 0;
-
-        // VIDEO — YouTube or local upload
-        $this->handleVideoInput($request, $input, $product);
-        
-        // Wholesale settings
-        $input['is_wholesale'] = $request->is_wholesale ? 1 : 0;
-
-        // SEO
-        $input['meta_title']       = $request->meta_title ?? $request->name;
-        $input['meta_description'] = $request->meta_description ?? $request->description;
-        $input['meta_keywords']    = $request->meta_keywords ?? '';
-
-        // META IMAGE UPDATE
-        if ($request->hasFile('meta_image')) {
-            if ($product->meta_image && file_exists($product->meta_image)) {
-                @unlink($product->meta_image);
-            }
-            $metaImg  = $request->file('meta_image');
-            $metaName = time().'-meta-'.$metaImg->getClientOriginalName();
-            $metaPath = 'public/uploads/product/meta/';
-            $metaImg->move($metaPath, $metaName);
-            $input['meta_image'] = $metaPath.$metaName;
+        if ($firstVariantPrice !== null) {
+            $input['new_price'] = $firstVariantPrice;
         }
 
-        // DIGITAL FILE UPDATE
-        if ($isDigital) {
-            $input['download_limit']       = $request->download_limit ?? $product->download_limit ?? 5;
-            $input['download_expire_days'] = $request->download_expire_days ?? $product->download_expire_days ?? 7;
+        // ===== VIDEO LOGIC (Update) =====
+        $this->handleVideoInput($request, $input, $product);
+
+        // DIGITAL PRODUCT FIELDS
+        if ($request->product_type === 'digital') {
+            $input['download_limit']      = $request->download_limit ?? 1;
+            $input['download_expire_days']= $request->download_expire_days ?? 7;
 
             if ($request->hasFile('digital_file')) {
-                // পুরনো ফাইল ডিলিট
                 if ($product->digital_file && Storage::disk('private')->exists($product->digital_file)) {
                     Storage::disk('private')->delete($product->digital_file);
                 }
-
                 $file = $request->file('digital_file');
                 $path = $file->store('digital-products', 'private');
                 $input['digital_file'] = $path;
-            } // নতুন ফাইল না দিলে digital_file আগেরটাই থাকবে (update-এ key না পাঠালে unchanged)
+            }
         } else {
-            // এখন যদি physical করে দাও, তাহলে digital ইনফো ডিলিট
             if ($product->digital_file && Storage::disk('private')->exists($product->digital_file)) {
                 Storage::disk('private')->delete($product->digital_file);
             }
@@ -536,85 +487,148 @@ class ProductController extends Controller
             $input['download_expire_days']= null;
         }
 
+        // Filter input to only columns that exist in the products table to avoid unknown column errors
+        $columns = \Illuminate\Support\Facades\Schema::getColumnListing('products');
+        $input = array_intersect_key($input, array_flip($columns));
+        unset($input['id']);
+
         // PRODUCT UPDATE
         $product->update($input);
-        Cache::forget('product_details_' . $product->slug);
 
-        // SIZE & COLOR
-        $product->sizes()->sync($request->proSize ?? []);
-        $product->colors()->sync($request->proColor ?? []);
-
-        // NEW IMAGES (with optional color/size per image)
+        // NEW PRODUCT IMAGES (Optimized to WebP with max 1200px)
         if ($request->hasFile('image')) {
             $imageColors = $request->image_color ?? [];
             $imageSizes  = $request->image_size ?? [];
             foreach ($request->file('image') as $idx => $img) {
-                $name = time().'-'.$img->getClientOriginalName();
-                $name = strtolower(preg_replace('/\s+/', '-', $name));
-                $path = 'public/uploads/product/';
-                $img->move($path, $name);
-
-                $colorId = $imageColors[$idx] ?? null;
-                $sizeId  = $imageSizes[$idx] ?? null;
+                $savedPath = ImageOptimizerService::uploadProductImage($img, 'public/uploads/product/', 'prod');
+                $colorId   = $imageColors[$idx] ?? null;
+                $sizeId    = $imageSizes[$idx] ?? null;
 
                 Productimage::create([
                     'product_id' => $product->id,
-                    'image'      => $path.$name,
+                    'image'      => $savedPath,
                     'color_id'   => $colorId ?: null,
                     'size_id'    => $sizeId ?: null,
                 ]);
             }
         }
 
-        // VARIANT IMAGES (from Product Variants - variant_image[row][image], image_row links to row)
-        if ($request->variant_price && is_array($request->variant_price)) {
-            $savedFiles = [];
-            $doneKeys = [];
-            foreach ($request->variant_price as $idx => $vp) {
-                $imageRow = $vp['image_row'] ?? $idx;
-                $colorId = $vp['color_id'] ?? null;
-                $sizeId = $vp['size_id'] ?? null;
-                if (!$colorId && !$sizeId) continue;
-                $file = $request->file("variant_image.{$imageRow}.image");
-                if (!$file) continue;
-                $key = ($colorId ?: '0') . '_' . ($sizeId ?: '0');
-                if (isset($doneKeys[$key])) continue;
-                $doneKeys[$key] = true;
-                if (!isset($savedFiles[$imageRow])) {
-                    $name = time().'-'.uniqid().'-'.$file->getClientOriginalName();
-                    $name = strtolower(preg_replace('/\s+/', '-', $name));
-                    $path = 'public/uploads/product/';
-                    $file->move($path, $name);
-                    $savedFiles[$imageRow] = $path.$name;
-                }
-                Productimage::create([
-                    'product_id' => $product->id,
-                    'image'      => $savedFiles[$imageRow],
-                    'color_id'   => $colorId ?: null,
-                    'size_id'    => $sizeId ?: null,
-                ]);
-            }
-        }
-
-        // VARIANTS UPDATE
+        // VARIANTS & VARIANT IMAGES UPDATE
         ProductVariantPrice::where('product_id', $product->id)->delete();
 
+        $collectedColors   = [];
+        $collectedSizes    = [];
+        $firstVariantPrice = null;
+        $keptVariantKeys   = []; // track valid (color_id, size_id) pairs to auto-delete orphaned variant images
+
         if ($request->variant_price && is_array($request->variant_price)) {
-            foreach ($request->variant_price as $variant) {
-                if (empty($variant['color_id']) && empty($variant['size_id'])) continue;
+            foreach ($request->variant_price as $idx => $variant) {
+                $colorId = !empty($variant['color_id']) ? (int)$variant['color_id'] : null;
+                $sizeId  = !empty($variant['size_id'])  ? (int)$variant['size_id']  : null;
+                $price   = isset($variant['price']) && $variant['price'] !== '' ? (float)$variant['price'] : 0;
+                $stock   = isset($variant['stock']) && $variant['stock'] !== '' ? (int)$variant['stock'] : 0;
+                $sku     = !empty($variant['sku']) ? trim($variant['sku']) : null;
+
+                // Skip completely empty rows
+                if (!$colorId && !$sizeId && $price <= 0 && $stock <= 0) {
+                    continue;
+                }
 
                 ProductVariantPrice::create([
                     'product_id' => $product->id,
-                    'color_id'   => $variant['color_id'] ?? null,
-                    'size_id'    => $variant['size_id'] ?? null,
-                    'price'      => $variant['price'] ?? 0,
-                    'stock'      => $variant['stock'] ?? 0,
+                    'color_id'   => $colorId,
+                    'size_id'    => $sizeId,
+                    'price'      => $price,
+                    'stock'      => $stock,
+                    'sku'        => $sku,
                 ]);
+
+                if ($colorId) $collectedColors[] = $colorId;
+                if ($sizeId)  $collectedSizes[]  = $sizeId;
+
+                $varKey = ($colorId ?: '0') . '_' . ($sizeId ?: '0');
+                $keptVariantKeys[$varKey] = true;
+
+                if ($firstVariantPrice === null && $price > 0) {
+                    $firstVariantPrice = $price;
+                }
+
+                // Check variant image upload
+                $varImgFile = $request->file("variant_image.{$idx}.image") ?: $request->file("variant_price.{$idx}.image");
+                if ($varImgFile && ($colorId || $sizeId)) {
+                    // Delete old variant image for this specific variant combination if replacing
+                    $oldVarImgs = Productimage::where('product_id', $product->id)
+                        ->where('color_id', $colorId ?: null)
+                        ->where('size_id', $sizeId ?: null)
+                        ->get();
+                    foreach ($oldVarImgs as $oldImg) {
+                        if ($oldImg->image) {
+                            if (file_exists(public_path($oldImg->image))) @unlink(public_path($oldImg->image));
+                            if (file_exists(base_path($oldImg->image)))   @unlink(base_path($oldImg->image));
+                        }
+                        $oldImg->delete();
+                    }
+
+                    $savedPath = ImageOptimizerService::uploadProductImage($varImgFile, 'public/uploads/product/', 'var');
+                    Productimage::create([
+                        'product_id' => $product->id,
+                        'image'      => $savedPath,
+                        'color_id'   => $colorId,
+                        'size_id'    => $sizeId,
+                    ]);
+                }
             }
 
             if ($firstVariantPrice !== null) {
                 $product->update(['new_price' => $firstVariantPrice]);
             }
+        }
+
+        // AUTO-DELETE ORPHANED VARIANT IMAGES:
+        // Any image for this product that was tied to a color or size that is NO LONGER among the active variants
+        $orphanImages = Productimage::where('product_id', $product->id)
+            ->where(function($q) {
+                $q->whereNotNull('color_id')->orWhereNotNull('size_id');
+            })
+            ->get();
+
+        foreach ($orphanImages as $orphan) {
+            $orphanKey = ($orphan->color_id ?: '0') . '_' . ($orphan->size_id ?: '0');
+            if (!isset($keptVariantKeys[$orphanKey])) {
+                // This variant was removed! Delete image file and database row
+                if ($orphan->image) {
+                    if (file_exists(public_path($orphan->image))) @unlink(public_path($orphan->image));
+                    if (file_exists(base_path($orphan->image)))   @unlink(base_path($orphan->image));
+                }
+                $orphan->delete();
+            }
+        }
+
+        // Explicitly deleted image IDs from form
+        if ($request->deleted_image_ids && is_array($request->deleted_image_ids)) {
+            $explicitDel = Productimage::where('product_id', $product->id)
+                ->whereIn('id', $request->deleted_image_ids)
+                ->get();
+            foreach ($explicitDel as $delImg) {
+                if ($delImg->image) {
+                    if (file_exists(public_path($delImg->image))) @unlink(public_path($delImg->image));
+                    if (file_exists(base_path($delImg->image)))   @unlink(base_path($delImg->image));
+                }
+                $delImg->delete();
+            }
+        }
+
+        // Auto-sync product sizes and colors
+        if (!empty($collectedSizes)) {
+            $product->sizes()->sync(array_unique($collectedSizes));
+        } elseif ($request->has('proSize')) {
+            $product->sizes()->sync($request->proSize ?? []);
+        }
+
+        if (!empty($collectedColors)) {
+            $product->colors()->sync(array_unique($collectedColors));
+        } elseif ($request->has('proColor')) {
+            $product->colors()->sync($request->proColor ?? []);
         }
 
         // WHOLESALE PRICING TIERS UPDATE
@@ -634,8 +648,41 @@ class ProductController extends Controller
             }
         }
 
+        Cache::forget('product_details_' . $product->slug);
+
         Toastr::success('Product updated successfully!');
         return redirect()->route('products.index');
+    }
+
+    // ================================
+    // STATUS TOGGLE (ACTIVE / INACTIVE)
+    // ================================
+    public function inactive(Request $request)
+    {
+        $product = Product::find($request->hidden_id);
+        if ($product) {
+            $product->status = 0;
+            $product->save();
+            Cache::forget('product_details_' . $product->slug);
+            Toastr::success('Success', 'Product deactivated successfully');
+        } else {
+            Toastr::error('Error', 'Product not found');
+        }
+        return redirect()->back();
+    }
+
+    public function active(Request $request)
+    {
+        $product = Product::find($request->hidden_id);
+        if ($product) {
+            $product->status = 1;
+            $product->save();
+            Cache::forget('product_details_' . $product->slug);
+            Toastr::success('Success', 'Product activated successfully');
+        } else {
+            Toastr::error('Error', 'Product not found');
+        }
+        return redirect()->back();
     }
 
     // ================================
@@ -688,6 +735,10 @@ class ProductController extends Controller
         $product = Product::find($productId);
         if ($product) {
             Cache::forget('product_details_' . $product->slug);
+        }
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json(['status' => 'success', 'message' => 'Image deleted successfully!']);
         }
 
         Toastr::success('Image deleted successfully!');

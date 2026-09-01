@@ -391,29 +391,33 @@ $brands = Brand::where('status', 1)
 
         Toastr::success('Product added to cart successfully', 'Success!');
 
-        // Facebook CAPI AddToCart (server-side)
+        // Facebook CAPI AddToCart (server-side, non-blocking after response)
         $atc_event_id = $request->input('event_id') ?: ('atc_' . $product->id . '_' . time());
-        try {
-            $capiUserData = [
-                'client_ip_address' => $request->ip(),
-                'client_user_agent' => $request->userAgent(),
-            ];
-            if (isset($_COOKIE['_fbp'])) $capiUserData['fbp'] = $_COOKIE['_fbp'];
-            if (isset($_COOKIE['_fbc'])) $capiUserData['fbc'] = $_COOKIE['_fbc'];
-            app(\App\Services\FacebookCapiService::class)->sendAddToCart([
-                'content_ids'   => [(string) $product->id],
-                'content_name'  => strip_tags($product->name),
-                'content_type'  => 'product',
-                'value'         => $finalPrice * $requestedQty,
-                'currency'      => 'BDT',
-                'num_items'     => $requestedQty,
-            ], $capiUserData, [
-                'event_id'        => $atc_event_id,
-                'event_source_url' => $request->fullUrl(),
-            ]);
-        } catch (\Throwable $e) {
-            // non-blocking
-        }
+        $capiUserData = [
+            'client_ip_address' => $request->ip(),
+            'client_user_agent' => $request->userAgent(),
+        ];
+        if (isset($_COOKIE['_fbp'])) $capiUserData['fbp'] = $_COOKIE['_fbp'];
+        if (isset($_COOKIE['_fbc'])) $capiUserData['fbc'] = $_COOKIE['_fbc'];
+        $atcPayload = [
+            'content_ids'   => [(string) $product->id],
+            'content_name'  => strip_tags($product->name),
+            'content_type'  => 'product',
+            'value'         => $finalPrice * $requestedQty,
+            'currency'      => 'BDT',
+            'num_items'     => $requestedQty,
+        ];
+        $atcOptions = [
+            'event_id'        => $atc_event_id,
+            'event_source_url' => $request->fullUrl(),
+        ];
+        dispatch(function () use ($atcPayload, $capiUserData, $atcOptions) {
+            try {
+                app(\App\Services\FacebookCapiService::class)->sendAddToCart($atcPayload, $capiUserData, $atcOptions);
+            } catch (\Throwable $e) {
+                // non-blocking
+            }
+        })->afterResponse();
 
         // AJAX/JSON: order_now হলে redirect URL JSON এ পাঠাতে হবে — নইলে ক্লায়েন্ট HTML/302 পেয়ে
         // data.success না মেনে ফর্ম আবার সাবমিট করে কার্টে ডাবল যোগ হয়।
@@ -913,29 +917,33 @@ $brands = Brand::where('status', 1)
             ->limit(50)
             ->get();
 
-        // Facebook CAPI ViewContent (event_id for Pixel deduplication)
+        // Facebook CAPI ViewContent (event_id for Pixel deduplication - non-blocking after response)
         $vc_event_id = 'vc_prod_' . $details->id . '_' . time();
-        try {
-            $capiUserData = [
-                'client_ip_address' => request()->ip(),
-                'client_user_agent' => request()->userAgent(),
-            ];
-            if (isset($_COOKIE['_fbp'])) $capiUserData['fbp'] = $_COOKIE['_fbp'];
-            if (isset($_COOKIE['_fbc'])) $capiUserData['fbc'] = $_COOKIE['_fbc'];
-            app(\App\Services\FacebookCapiService::class)->sendViewContent([
-                'content_name'   => strip_tags($details->name),
-                'content_ids'    => [(string) $details->id],
-                'content_type'   => 'product',
-                'value'          => (float) ($details->new_price ?? $details->old_price ?? 0),
-                'currency'       => 'BDT',
-                'content_category' => optional($details->category)->name ?? '',
-            ], $capiUserData, [
-                'event_id'        => $vc_event_id,
-                'event_source_url' => request()->fullUrl(),
-            ]);
-        } catch (\Throwable $e) {
-            // non-blocking
-        }
+        $capiUserData = [
+            'client_ip_address' => request()->ip(),
+            'client_user_agent' => request()->userAgent(),
+        ];
+        if (isset($_COOKIE['_fbp'])) $capiUserData['fbp'] = $_COOKIE['_fbp'];
+        if (isset($_COOKIE['_fbc'])) $capiUserData['fbc'] = $_COOKIE['_fbc'];
+        $vcPayload = [
+            'content_name'   => strip_tags($details->name),
+            'content_ids'    => [(string) $details->id],
+            'content_type'   => 'product',
+            'value'          => (float) ($details->new_price ?? $details->old_price ?? 0),
+            'currency'       => 'BDT',
+            'content_category' => optional($details->category)->name ?? '',
+        ];
+        $vcOptions = [
+            'event_id'        => $vc_event_id,
+            'event_source_url' => request()->fullUrl(),
+        ];
+        dispatch(function () use ($vcPayload, $capiUserData, $vcOptions) {
+            try {
+                app(\App\Services\FacebookCapiService::class)->sendViewContent($vcPayload, $capiUserData, $vcOptions);
+            } catch (\Throwable $e) {
+                // non-blocking
+            }
+        })->afterResponse();
 
         return view('frontEnd.layouts.pages.details', compact(
             'details',
@@ -1128,29 +1136,33 @@ $brands = Brand::where('status', 1)
             Session::put('shipping', $select_charge->amount);
         }
 
-        // Facebook CAPI ViewContent — server-side, event_id দিয়ে Pixel-এর সাথে deduplicate হবে
+        // Facebook CAPI ViewContent — server-side, non-blocking after response
         $fb_view_content_event_id = 'vc_camp' . $campaign_data->id . '_' . time();
-        try {
-            $capiUserData = [
-                'client_ip_address' => request()->ip(),
-                'client_user_agent' => request()->userAgent(),
-            ];
-            if (isset($_COOKIE['_fbp'])) $capiUserData['fbp'] = $_COOKIE['_fbp'];
-            if (isset($_COOKIE['_fbc'])) $capiUserData['fbc'] = $_COOKIE['_fbc'];
-            app(\App\Services\FacebookCapiService::class)->sendViewContent([
-                'content_name' => strip_tags($campaign_data->name),
-                'content_ids'  => $products->pluck('id')->map(function($id) { return (string)$id; })->values()->toArray(),
-                'content_type' => 'product',
-                'value'        => (float) (optional($products->first())->new_price ?? 0),
-                'currency'     => 'BDT',
-                'num_items'    => $products->count(),
-            ], $capiUserData, [
-                'event_id'        => $fb_view_content_event_id,
-                'event_source_url' => request()->fullUrl(),
-            ]);
-        } catch (\Throwable $e) {
-            // Silently fail — page load block করবে না
-        }
+        $capiUserData = [
+            'client_ip_address' => request()->ip(),
+            'client_user_agent' => request()->userAgent(),
+        ];
+        if (isset($_COOKIE['_fbp'])) $capiUserData['fbp'] = $_COOKIE['_fbp'];
+        if (isset($_COOKIE['_fbc'])) $capiUserData['fbc'] = $_COOKIE['_fbc'];
+        $campPayload = [
+            'content_name' => strip_tags($campaign_data->name),
+            'content_ids'  => $products->pluck('id')->map(function($id) { return (string)$id; })->values()->toArray(),
+            'content_type' => 'product',
+            'value'        => (float) (optional($products->first())->new_price ?? 0),
+            'currency'     => 'BDT',
+            'num_items'    => $products->count(),
+        ];
+        $campOptions = [
+            'event_id'        => $fb_view_content_event_id,
+            'event_source_url' => request()->fullUrl(),
+        ];
+        dispatch(function () use ($campPayload, $capiUserData, $campOptions) {
+            try {
+                app(\App\Services\FacebookCapiService::class)->sendViewContent($campPayload, $capiUserData, $campOptions);
+            } catch (\Throwable $e) {
+                // Silently fail — page load block করবে না
+            }
+        })->afterResponse();
 
         // Page builder দিয়ে ডিজাইন করা থাকলে আলাদা ভিউ
         if (!empty($campaign_data->page_html)) {

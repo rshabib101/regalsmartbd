@@ -266,6 +266,20 @@ if (typeof ttq !== 'undefined') {
     border-left: 3px solid #28a745 !important;
 }
 
+/* Indicator Thumbnails */
+.indicator-item {
+    cursor: pointer;
+    border: 2px solid #e0e0e0;
+    transition: all 0.2s ease;
+    border-radius: 6px;
+    overflow: hidden;
+}
+.indicator-item:hover,
+.indicator-item.active {
+    border-color: #28a745 !important;
+    box-shadow: 0 0 6px rgba(40, 167, 69, 0.4);
+}
+
 /* Review Modal: z-index fix যাতে ব্যাকড্রপের পিছনে না পড়ে এবং ক্লিক/টাইপ কাজ করে */
 #exampleModal {
     z-index: 10055 !important;
@@ -300,8 +314,8 @@ if (typeof ttq !== 'undefined') {
                                 </div>
                                 @endif
                                 <div class="details_slider owl-carousel" id="details_slider_main">
-                                    @foreach ($details->images as $value)
-                                        <div class="dimage_item" data-color-id="{{ $value->color_id ?? '' }}">
+                                    @foreach ($details->images as $key => $value)
+                                        <div class="dimage_item" data-id="{{ $key }}" data-color-id="{{ $value->color_id ?? '' }}" data-size-id="{{ $value->size_id ?? '' }}">
                                             <img src="{{ asset($value->image) }}" class="block__pic" />
                                         </div>
                                     @endforeach
@@ -309,7 +323,7 @@ if (typeof ttq !== 'undefined') {
                                 <div
                                     class="indicator_thumb @if ($details->images->count() > 4) thumb_slider owl-carousel @endif" id="indicator_thumb_wrapper">
                                     @foreach ($details->images as $key => $image)
-                                        <div class="indicator-item" data-id="{{ $key }}" data-color-id="{{ $image->color_id ?? '' }}">
+                                        <div class="indicator-item {{ $loop->first ? 'active' : '' }}" data-id="{{ $key }}" data-color-id="{{ $image->color_id ?? '' }}" data-size-id="{{ $image->size_id ?? '' }}">
                                             <img src="{{ asset($image->image) }}" />
                                         </div>
                                     @endforeach
@@ -342,10 +356,8 @@ if (typeof ttq !== 'undefined') {
                                         <div class="product-cart">
                                             <p class="name">{{ $details->name }}</p>
                                             <p class="details-price">
-                                                @if ($details->old_price)
-                                                    <del>৳{{ $details->old_price }}</del>
-                                                @endif <span id="newPrice">৳{{ $details->new_price }}</span>
-
+                                                <del id="oldPrice" style="{{ ($details->old_price && $details->old_price > $displayPrice) ? '' : 'display:none;' }}">৳{{ $details->old_price }}</del>
+                                                <span id="newPrice">৳{{ $displayPrice }}</span>
                                             </p>
                                             <div class="details-ratting-wrapper">
                                             @php
@@ -927,42 +939,72 @@ if (typeof ttq !== 'undefined') {
     @endif
 
     function updateVariantPrice() {
-        let color = $("input[name='product_color']:checked").val() || null;
-        let size  = $("input[name='product_size']:checked").val() || null;
+        let colorInput = $("input[name='product_color']:checked");
+        let sizeInput  = $("input[name='product_size']:checked");
+
+        let color = colorInput.val() || null;
+        let size  = sizeInput.val() || null;
+
+        // Update selected attribute name display
+        let selectedNames = [];
+        if (sizeInput.length) {
+            let sLabel = sizeInput.closest('.selector-item').find('label').text().trim();
+            if (sLabel) selectedNames.push(sLabel);
+        }
+        if (colorInput.length) {
+            let cLabel = colorInput.closest('.selector-item').find('label').attr('title') || colorInput.closest('.selector-item').find('label').text().trim();
+            if (cLabel) selectedNames.push(cLabel);
+        }
+        $('.attibute-name').text(selectedNames.length ? ': ' + selectedNames.join(' / ') : '');
 
         let match = null;
 
-        // ✅ color + size (both selected)
+        // 1. Both color and size selected
         if (color && size) {
             match = variants.find(v => {
-                let vColorId = v.color_id ?? v.color;
-                let vSizeId = v.size_id ?? v.size;
-                return String(vColorId) == String(color) && String(vSizeId) == String(size);
+                let vColorId = (v.color_id !== null && v.color_id !== undefined) ? String(v.color_id) : (v.color && v.color.id ? String(v.color.id) : null);
+                let vSizeId  = (v.size_id  !== null && v.size_id  !== undefined) ? String(v.size_id)  : (v.size && v.size.id ? String(v.size.id) : null);
+                return vColorId === String(color) && vSizeId === String(size);
             });
         }
 
-        // ✅ only color (no size selected)
-        if (!match && color && !size) {
+        // 2. Only size selected (prefer variant with null/empty color, then fallback to any matching size)
+        if (!match && size) {
             match = variants.find(v => {
-                let vColorId = v.color_id ?? v.color;
-                let vSizeId = v.size_id ?? v.size;
-                return String(vColorId) == String(color) && (vSizeId === null || vSizeId === '');
+                let vColorId = (v.color_id !== null && v.color_id !== undefined) ? String(v.color_id) : (v.color && v.color.id ? String(v.color.id) : null);
+                let vSizeId  = (v.size_id  !== null && v.size_id  !== undefined) ? String(v.size_id)  : (v.size && v.size.id ? String(v.size.id) : null);
+                return vSizeId === String(size) && (!vColorId || vColorId === '');
             });
+            if (!match) {
+                match = variants.find(v => {
+                    let vSizeId = (v.size_id !== null && v.size_id !== undefined) ? String(v.size_id) : (v.size && v.size.id ? String(v.size.id) : null);
+                    return vSizeId === String(size);
+                });
+            }
         }
 
-        // ✅ only size (no color selected)
-        if (!match && size && !color) {
+        // 3. Only color selected (prefer variant with null/empty size, then fallback to any matching color)
+        if (!match && color) {
             match = variants.find(v => {
-                let vColorId = v.color_id ?? v.color;
-                let vSizeId = v.size_id ?? v.size;
-                return String(vSizeId) == String(size) && (vColorId === null || vColorId === '');
+                let vColorId = (v.color_id !== null && v.color_id !== undefined) ? String(v.color_id) : (v.color && v.color.id ? String(v.color.id) : null);
+                let vSizeId  = (v.size_id  !== null && v.size_id  !== undefined) ? String(v.size_id)  : (v.size && v.size.id ? String(v.size.id) : null);
+                return vColorId === String(color) && (!vSizeId || vSizeId === '');
             });
+            if (!match) {
+                match = variants.find(v => {
+                    let vColorId = (v.color_id !== null && v.color_id !== undefined) ? String(v.color_id) : (v.color && v.color.id ? String(v.color.id) : null);
+                    return vColorId === String(color);
+                });
+            }
         }
 
-        // ✅ update UI
-        let basePrice = parseFloat({{ $details->new_price }});
-        if (match && match.price !== undefined && match.price !== null) {
-            // Variant price is the actual price for this color/size combination
+        // Fallback: first variant if none matched
+        if (!match && variants && variants.length > 0) {
+            match = variants[0];
+        }
+
+        let basePrice = parseFloat({{ (float)$displayPrice }});
+        if (match && match.price !== undefined && match.price !== null && parseFloat(match.price) > 0) {
             basePrice = parseFloat(match.price);
         }
 
@@ -976,6 +1018,14 @@ if (typeof ttq !== 'undefined') {
         @endif
 
         $('#newPrice').text('৳' + basePrice.toFixed(2));
+
+        // Update Old Price display
+        let oldPriceVal = parseFloat({{ (float)($details->old_price ?? 0) }});
+        if (oldPriceVal > basePrice) {
+            $('#oldPrice').show().text('৳' + oldPriceVal.toFixed(2));
+        } else {
+            $('#oldPrice').hide();
+        }
     }
 
     // ভ্যারিয়েন্ট ইমেজ লিস্ট (কালার ও সাইজ উভয়টি অন্তর্ভুক্ত)
@@ -992,95 +1042,122 @@ if (typeof ttq !== 'undefined') {
         }
     @endphp
     var productImages = {!! json_encode($productImagesList) !!};
+    var currentVariantImgKey = null;
 
-    function updateImagesByVariant(colorId, sizeId) {
-        var colorIdStr = colorId ? String(colorId) : null;
-        var sizeIdStr  = sizeId ? String(sizeId) : null;
-        var filteredImages = [];
-
-        // ১. কালার এবং সাইজ উভয় মিলে
-        if (colorIdStr && sizeIdStr) {
-            filteredImages = productImages.filter(function(img) {
-                return img.color_id === colorIdStr && img.size_id === sizeIdStr;
-            });
-        }
-
-        // ২. শুধুমাত্র সাইজ মিলে (যদি সাইজ সিলেক্ট করা থাকে এবং স্পেসিফিক ইমেজ থাকে)
-        if (filteredImages.length === 0 && sizeIdStr) {
-            filteredImages = productImages.filter(function(img) {
-                return img.size_id === sizeIdStr;
-            });
-        }
-
-        // ৩. শুধুমাত্র কালার মিলে
-        if (filteredImages.length === 0 && colorIdStr) {
-            filteredImages = productImages.filter(function(img) {
-                return img.color_id === colorIdStr;
-            });
-        }
-
-        // ৪. ডিফল্ট ইমেজ (যেগুলোতে কালার বা সাইজ নেই)
-        if (filteredImages.length === 0) {
-            filteredImages = productImages.filter(function(img) {
-                return !img.color_id && !img.size_id;
-            });
-        }
-
-        // ৫. ফলব্যাক: সকল ইমেজ
-        if (filteredImages.length === 0) {
-            filteredImages = productImages;
-        }
-
-        if (filteredImages.length === 0) return;
-
+    function initDetailsSliders() {
         var $slider = $(".details_slider");
-        var owl = $slider.data("owl.carousel");
-        if (owl) owl.destroy();
+        if (!$slider.hasClass("owl-loaded")) {
+            $slider.owlCarousel({
+                margin: 15,
+                items: 1,
+                loop: $slider.find(".dimage_item").length > 1,
+                dots: false,
+                autoplay: false,
+                nav: false,
+            });
 
-        var sliderHtml = filteredImages.map(function(img, i) {
-            return '<div class="dimage_item"><img src="' + img.src + '" class="block__pic" /></div>';
-        }).join('');
-        $slider.html(sliderHtml);
-
-        var thumbHtml = filteredImages.map(function(img, i) {
-            return '<div class="indicator-item" data-id="' + i + '"><img src="' + img.src + '" /></div>';
-        }).join('');
-        var $thumbWrapper = $("#indicator_thumb_wrapper");
-        var thumbOwl = $thumbWrapper.data("owl.carousel");
-        if (thumbOwl) thumbOwl.destroy();
-        $thumbWrapper.removeClass("thumb_slider owl-carousel").html(thumbHtml);
-        if (filteredImages.length > 4) {
-            $thumbWrapper.addClass("thumb_slider owl-carousel");
-            $thumbWrapper.owlCarousel({ margin: 15, items: 4, loop: true, dots: false, nav: true, autoplayTimeout: 6000, autoplayHoverPause: true });
+            // স্লাইড পরিবর্তন হলে থাম্বনেইল একটিভ ক্লাস সিঙ্ক
+            $slider.on("changed.owl.carousel", function(event) {
+                if (!event.item || event.item.count <= 0) return;
+                var count = event.item.count;
+                var currentIdx = event.item.index;
+                var cloneOffset = event.relatedTarget && event.relatedTarget._clones ? event.relatedTarget._clones.length / 2 : 0;
+                var realIdx = (currentIdx - cloneOffset) % count;
+                if (realIdx < 0) realIdx += count;
+                $(".indicator-item").removeClass("active");
+                $(".indicator-item[data-id='" + realIdx + "']").addClass("active");
+            });
         }
 
-        $slider.owlCarousel({
-            margin: 15,
-            items: 1,
-            loop: filteredImages.length > 1,
-            dots: false,
-            autoplay: true,
-            autoplayTimeout: 6000,
-            autoplayHoverPause: true,
-        });
-
-        $(".indicator-item").off("click").on("click", function() {
-            var slideIndex = parseInt($(this).data("id"), 10);
-            $slider.trigger("to.owl.carousel", slideIndex);
-        });
+        var $thumbWrapper = $("#indicator_thumb_wrapper");
+        if (!$thumbWrapper.hasClass("owl-loaded") && $thumbWrapper.find(".indicator-item").length > 4) {
+            $thumbWrapper.addClass("thumb_slider owl-carousel");
+            $thumbWrapper.owlCarousel({
+                margin: 10,
+                items: 4,
+                loop: false,
+                dots: false,
+                nav: true,
+                autoplay: false
+            });
+        }
 
         if ($(".block__pic").length && typeof $(".block__pic").imagezoomsl === "function") {
-            $(".block__pic").imagezoomsl({ zoomrange: [3, 3] });
+            try { $(".block__pic").imagezoomsl({ zoomrange: [3, 3] }); } catch (e) {}
         }
     }
 
-    // Call on page load if color/size is already selected
+    // থাম্বনেইলে ক্লিক করলে মেইন স্লাইডার সেই ইমেজে যাবে এবং ভ্যারিয়েন্ট সিলেক্ট হবে
+    $(document).on("click", ".indicator-item", function() {
+        var slideIndex = parseInt($(this).data("id"), 10);
+        var $slider = $(".details_slider");
+        if ($slider.hasClass("owl-loaded")) {
+            $slider.trigger("to.owl.carousel", [slideIndex, 250]);
+        }
+        $(".indicator-item").removeClass("active");
+        $(this).addClass("active");
+
+        // যদি এই থাম্বনেইলের সাথে সাইজ বা কালার যুক্ত থাকে, তাহলে রেডিও বাটন অটো সিলেক্ট হবে
+        var sId = $(this).data("size-id");
+        var cId = $(this).data("color-id");
+        if (sId) {
+            var $sRadio = $("input[name='product_size'][value='" + sId + "']");
+            if ($sRadio.length && !$sRadio.is(":checked")) {
+                $sRadio.prop("checked", true).trigger("change");
+            }
+        }
+        if (cId) {
+            var $cRadio = $("input[name='product_color'][value='" + cId + "']");
+            if ($cRadio.length && !$cRadio.is(":checked")) {
+                $cRadio.prop("checked", true).trigger("change");
+            }
+        }
+    });
+
+    // ভ্যারিয়েন্ট (কালার/সাইজ) সিলেক্ট করলে মেইন স্লাইডার সেই ভ্যারিয়েন্টের ইমেজে যাবে (থাম্বনেইল নষ্ট হবে না)
+    function syncVariantImage(colorId, sizeId) {
+        if (!productImages || productImages.length <= 1) return;
+        var colorIdStr = colorId ? String(colorId) : '';
+        var sizeIdStr  = sizeId ? String(sizeId) : '';
+
+        var targetIndex = -1;
+
+        // ১. কালার এবং সাইজ উভয় মিলে
+        if (colorIdStr && sizeIdStr) {
+            targetIndex = productImages.findIndex(function(img) {
+                return String(img.color_id) === colorIdStr && String(img.size_id) === sizeIdStr;
+            });
+        }
+        // ২. শুধুমাত্র সাইজ মিলে
+        if (targetIndex === -1 && sizeIdStr) {
+            targetIndex = productImages.findIndex(function(img) {
+                return String(img.size_id) === sizeIdStr;
+            });
+        }
+        // ৩. শুধুমাত্র কালার মিলে
+        if (targetIndex === -1 && colorIdStr) {
+            targetIndex = productImages.findIndex(function(img) {
+                return String(img.color_id) === colorIdStr;
+            });
+        }
+
+        if (targetIndex !== -1) {
+            var $slider = $(".details_slider");
+            if ($slider.hasClass("owl-loaded")) {
+                $slider.trigger("to.owl.carousel", [targetIndex, 250]);
+            }
+            $(".indicator-item").removeClass("active");
+            $(".indicator-item[data-id='" + targetIndex + "']").addClass("active");
+        }
+    }
+
     $(document).ready(function() {
+        initDetailsSliders();
         updateVariantPrice();
         var initialColor = $("input[name='product_color']:checked").val() || null;
         var initialSize  = $("input[name='product_size']:checked").val() || null;
         if (initialColor || initialSize) {
-            updateImagesByVariant(initialColor, initialSize);
+            syncVariantImage(initialColor, initialSize);
         }
     });
 
@@ -1091,29 +1168,9 @@ if (typeof ttq !== 'undefined') {
             updateVariantPrice();
             var c = $("input[name='product_color']:checked").val() || null;
             var s = $("input[name='product_size']:checked").val() || null;
-            updateImagesByVariant(c, s);
+            syncVariantImage(c, s);
         }
     );
-</script>
-
-
-
-<script>
-    $(document).ready(function() {
-        $(".details_slider").owlCarousel({
-            margin: 15,
-            items: 1,
-            loop: true,
-            dots: false,
-            autoplay: true,
-            autoplayTimeout: 6000,
-            autoplayHoverPause: true,
-        });
-        $(".indicator-item").on("click", function() {
-            var slideIndex = $(this).data("id");
-            $(".details_slider").trigger("to.owl.carousel", slideIndex);
-        });
-    });
 </script>
 
 
@@ -1314,23 +1371,5 @@ if (typeof ttq !== 'undefined') {
         });
     });
 </script>
-<script>
-    $(document).ready(function() {
-        $(".thumb_slider").owlCarousel({
-            margin: 15,
-            items: 4,
-            loop: true,
-            dots: false,
-            nav: true,
-            autoplayTimeout: 6000,
-            autoplayHoverPause: true,
-        });
-    });
-</script>
 
-<script type="text/javascript">
-    $(".block__pic").imagezoomsl({
-        zoomrange: [3, 3]
-    });
-</script>
 @endpush
