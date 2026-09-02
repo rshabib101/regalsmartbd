@@ -1039,6 +1039,8 @@
         const hasAdvance   = @json($hasAdvance);
         const advanceAmount= parseFloat("{{ $advance_amount }}") || 0;
         const grandTotal   = parseFloat("{{ $grand_total }}") || 0;
+        // ⭐ Facebook ICO value = শুধু product subtotal (shipping বাদ) — Facebook standard
+        const subtotal     = parseFloat("{{ $subtotal }}") || 0;
         const payableNow   = hasAdvance ? advanceAmount : grandTotal;
         const coupon       = @json(Session::get('coupon_code', null));
         const icoEventId   = "{{ $ico_event_id ?? ('ico_' . time()) }}";
@@ -1068,17 +1070,17 @@
         }
 
         // Facebook Pixel: InitiateCheckout (deduplicated with CAPI)
+        // ⭐ value = subtotal only (shipping বাদ) — Facebook best practice
         if (typeof fbq === "function" && items.length) {
             fbq("track", "InitiateCheckout", {
-                value: grandTotal,
+                value: subtotal,
                 currency: "BDT",
                 num_items: items.length,
                 content_ids: items.map(function(i){ return String(i.id); }),
                 contents: items.map(function(i){
                     return {id: String(i.id), quantity: i.qty, item_price: i.price};
                 }),
-                content_type: 'product',
-                coupon: coupon || undefined
+                content_type: 'product'
             }, { eventID: icoEventId });
         }
 

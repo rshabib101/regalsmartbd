@@ -812,11 +812,8 @@ class CustomerController extends Controller
                     'quantity' => (int)$i->qty,
                     'item_price' => (float)$i->price,
                 ])->values()->toArray();
-                // ⭐ Browser এর grandTotal এর সাথে match করতে: subtotal + shipping - discount
-                $rawSubtotal   = (float) str_replace(',', '', Cart::instance('shopping')->subtotal());
-                $shippingAmt   = (float) Session::get('shipping', 0);
-                $discountAmt   = (float) Session::get('discount', 0);
-                $checkoutValue = round($rawSubtotal + $shippingAmt - $discountAmt, 2);
+                // ⭐ Facebook standard: value = শুধু product subtotal (shipping বাদ)
+                $checkoutValue = (float) str_replace(',', '', Cart::instance('shopping')->subtotal());
                 $capiUserData = [
                     'client_ip_address' => request()->ip(),
                     'client_user_agent' => request()->userAgent(),
