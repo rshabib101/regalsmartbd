@@ -406,6 +406,8 @@ $brands = Brand::where('status', 1)
             'value'         => $finalPrice * $requestedQty,
             'currency'      => 'BDT',
             'num_items'     => $requestedQty,
+            // ⭐ contents array — browser pixel এর সাথে match করতে (Facebook deduplication)
+            'contents'      => [['id' => (string) $product->id, 'quantity' => $requestedQty, 'item_price' => $finalPrice]],
         ];
         $atcOptions = [
             'event_id'        => $atc_event_id,
@@ -422,7 +424,14 @@ $brands = Brand::where('status', 1)
         // AJAX/JSON: order_now হলে redirect URL JSON এ পাঠাতে হবে — নইলে ক্লায়েন্ট HTML/302 পেয়ে
         // data.success না মেনে ফর্ম আবার সাবমিট করে কার্টে ডাবল যোগ হয়।
         if ($request->ajax() || $request->wantsJson()) {
-            $payload = ['success' => true, 'id' => $product->id, 'event_id' => $atc_event_id];
+            // ⭐ price ও qty return করা হচ্ছে — browser pixel DB price ব্যবহার করবে, DOM price না
+            $payload = [
+                'success'  => true,
+                'id'       => $product->id,
+                'event_id' => $atc_event_id,
+                'price'    => $finalPrice,
+                'qty'      => $requestedQty,
+            ];
             if ($request->has('order_now')) {
                 $payload['redirect'] = route('customer.checkout');
             }

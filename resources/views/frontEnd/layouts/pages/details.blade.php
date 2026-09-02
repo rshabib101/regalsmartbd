@@ -1332,7 +1332,10 @@ if (typeof ttq !== 'undefined') {
                 var data = JSON.parse(xhr.responseText);
                 if (data && data.success) {
                     if (typeof fireAddToCartEvent === "function") {
-                        fireAddToCartEvent(null, '{{ $details->id }}', qty, @json($details->name), {{ (float)($details->new_price ?? 0) }}, @json(optional($details->category)->name ?? ''), (data && data.event_id) ? data.event_id : atcEventId);
+                        // ⭐ DB price ব্যবহার (server response priority) — DOM/Blade hardcode বাদ
+                        var serverPrice = (data && data.price) ? parseFloat(data.price) : {{ (float)($details->new_price ?? 0) }};
+                        var serverQty   = (data && data.qty)   ? parseInt(data.qty)     : qty;
+                        fireAddToCartEvent(null, '{{ $details->id }}', serverQty, @json($details->name), serverPrice, @json(optional($details->category)->name ?? ''), (data && data.event_id) ? data.event_id : atcEventId);
                     }
                     if (typeof toastr !== "undefined") toastr.success("কার্টে যোগ হয়েছে!", "সফল");
                     if (typeof cart_count === "function") cart_count();

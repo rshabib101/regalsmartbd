@@ -2045,7 +2045,10 @@ document.getElementById("chatToggle").addEventListener("click", function() {
                         dataType: "json",
                         success: function (data) {
                             if (data) {
-                                fireAddToCartEvent(null, id, qty, name, price, category, (data && data.event_id) ? data.event_id : eventId);
+                                // ⭐ DB price ব্যবহার — DOM price বাদ (browser-server value match)
+                                var serverPrice = (data && data.price) ? parseFloat(data.price) : price;
+                                var serverQty   = (data && data.qty)   ? parseInt(data.qty)     : qty;
+                                fireAddToCartEvent(null, id, serverQty, name, serverPrice, category, (data && data.event_id) ? data.event_id : eventId);
                                 toastr.success('কার্টে যোগ হয়েছে!', 'সফল');
                                 cart_count();
                                 mobile_cart();
@@ -2084,7 +2087,10 @@ document.getElementById("chatToggle").addEventListener("click", function() {
                     headers: { 'X-Requested-With': 'XMLHttpRequest' },
                     success: function (data) {
                         if (data && data.success) {
-                            fireAddToCartEvent(null, id, qty, name, price, category, (data && data.event_id) ? data.event_id : eventId);
+                            // ⭐ DB price ব্যবহার — DOM price বাদ (browser-server value match)
+                            var serverPrice = (data && data.price) ? parseFloat(data.price) : price;
+                            var serverQty   = (data && data.qty)   ? parseInt(data.qty)     : qty;
+                            fireAddToCartEvent(null, id, serverQty, name, serverPrice, category, (data && data.event_id) ? data.event_id : eventId);
                             toastr.success('কার্টে যোগ হয়েছে!', 'সফল');
                             cart_count();
                             mobile_cart();
