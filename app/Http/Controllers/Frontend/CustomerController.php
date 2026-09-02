@@ -821,15 +821,26 @@ class CustomerController extends Controller
                 if (isset($_COOKIE['_fbp'])) $capiUserData['fbp'] = $_COOKIE['_fbp'];
                 if (isset($_COOKIE['_fbc'])) $capiUserData['fbc'] = $_COOKIE['_fbc'];
                 $ico_event_id = 'ico_' . time();
+
+                // ⭐ প্রথম cart item থেকে content_name ও content_category নাও
+                $firstItem = $cartContent->first();
+                $firstProduct = $firstItem
+                    ? \App\Models\Product::with('category')->find($firstItem->id)
+                    : null;
+
                 app(\App\Services\FacebookCapiService::class)->sendInitiateCheckout([
-                    'currency'     => 'BDT',
-                    'value'        => $checkoutValue,
-                    'content_ids'  => $contentIds,
-                    'contents'     => $contents,
-                    'num_items'    => $cartContent->count(),
-                    'content_type' => 'product',
+                    'currency'         => 'BDT',
+                    'value'            => $checkoutValue,
+                    'content_ids'      => $contentIds,
+                    'contents'         => $contents,
+                    'num_items'        => $cartContent->count(),
+                    'content_type'     => 'product',
+                    // ⭐ Bhoorwear standard: content_name, content_category, shipping
+                    'content_name'     => $firstProduct ? strip_tags($firstProduct->name) : ($firstItem->name ?? ''),
+                    'content_category' => optional($firstProduct?->category)->name ?? '',
+                    'shipping'         => 0,
                 ], $capiUserData, [
-                    'event_id'        => $ico_event_id,
+                    'event_id'         => $ico_event_id,
                     'event_source_url' => request()->fullUrl(),
                 ]);
 
@@ -1155,15 +1166,44 @@ public function order_save(Request $request)
             // Send Facebook Purchase event for COD orders (async - don't block order submission)
             try {
                 $customer = Customer::find($customer_id);
-                $userData = [];
-                
-                // Get customer email or phone
+                $shipping = \App\Models\Shipping::where('order_id', $order->id)->first();
+                $userData = [
+                    'country_code' => 'bd',
+                ];
+
+                // Name
+                $fullName = $shipping?->name ?? ($customer?->name ?? '');
+                if (!empty($fullName)) {
+                    $userData['first_name'] = $fullName;
+                }
+
+                // Email
                 if ($customer && $customer->email) {
                     $userData['email'] = $customer->email;
+                } elseif (!empty($shipping?->email)) {
+                    $userData['email'] = $shipping->email;
+                } elseif ($request->email) {
+                    $userData['email'] = $request->email;
+                }
+
+                // Phone
+                if (!empty($shipping?->phone)) {
+                    $userData['phone'] = $shipping->phone;
                 } elseif ($request->phone) {
                     $userData['phone'] = $request->phone;
                 } elseif ($customer && $customer->phone) {
                     $userData['phone'] = $customer->phone;
+                }
+
+                // City / State / Area
+                if (!empty($shipping?->area)) {
+                    $userData['city']  = $shipping->area;
+                    $userData['state'] = $shipping->area;
+                }
+
+                // External ID
+                if (!empty($order->customer_id)) {
+                    $userData['external_id'] = (string) $order->customer_id;
                 }
                 
                 // Get Facebook Pixel cookies if available
@@ -1178,17 +1218,25 @@ public function order_save(Request $request)
                 // Use register_shutdown_function to send after response is sent to user
                 register_shutdown_function(function () use ($order, $userData, $request) {
                     try {
-                        $orderDetails = $order->orderdetails ?? \App\Models\Order::with('orderdetails')->find($order->id)?->orderdetails ?? collect();
+                        $orderDetails = $order->orderdetails ?? \App\Models\Order::with('orderdetails.product.category')->find($order->id)?->orderdetails ?? collect();
                         $contentIds  = $orderDetails->pluck('product_id')->map(fn($id) => (string)$id)->values()->toArray();
                         $contents    = $orderDetails->map(fn($i) => ['id' => (string)$i->product_id, 'quantity' => (int)$i->qty, 'item_price' => (float)$i->sale_price])->values()->toArray();
+                        $totalQty    = $orderDetails->sum('qty') ?: count($contents);
+                        $firstDetail = $orderDetails->first();
+                        $firstProduct = $firstDetail?->product ?? ($firstDetail ? \App\Models\Product::with('category')->find($firstDetail->product_id) : null);
+
                         app(\App\Services\FacebookCapiService::class)->sendEvent('Purchase', [
-                            'currency'     => 'BDT',
-                            'value'        => $order->amount,
-                            'order_id'     => $order->invoice_id ?? $order->id,
-                            'content_ids'  => $contentIds,
-                            'contents'     => $contents,
-                            'num_items'    => count($contents),
-                            'content_type' => 'product',
+                            'currency'         => 'BDT',
+                            'value'            => (float) $order->amount,
+                            'order_id'         => (string) ($order->invoice_id ?? $order->id),
+                            'transaction_id'   => (string) ($order->invoice_id ?? $order->id),
+                            'content_ids'      => $contentIds,
+                            'contents'         => $contents,
+                            'num_items'        => (int) $totalQty,
+                            'content_type'     => 'product',
+                            'shipping'         => (float) ($order->shipping_charge ?? 0),
+                            'content_name'     => $firstDetail?->product_name ?? ($firstProduct?->name ?? ''),
+                            'content_category' => optional($firstProduct?->category)->name ?? '',
                         ], $userData, [
                             'event_id'          => 'purchase_' . ($order->invoice_id ?? $order->id),
                             'event_source_url'  => $request->fullUrl(),

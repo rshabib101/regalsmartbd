@@ -296,7 +296,7 @@ $brands = Brand::where('status', 1)
         // [END] লজিক শেষ
         // =========================================================
 
-        $product = Product::with('image')->findOrFail($request->id);
+        $product = Product::with(['image', 'category'])->findOrFail($request->id);
 
         // 1) প্রোডাক্টের স্টক বের করি
         $availableStock = $this->getAvailableStock($product);
@@ -400,14 +400,15 @@ $brands = Brand::where('status', 1)
         if (isset($_COOKIE['_fbp'])) $capiUserData['fbp'] = $_COOKIE['_fbp'];
         if (isset($_COOKIE['_fbc'])) $capiUserData['fbc'] = $_COOKIE['_fbc'];
         $atcPayload = [
-            'content_ids'   => [(string) $product->id],
-            'content_name'  => strip_tags($product->name),
-            'content_type'  => 'product',
-            'value'         => $finalPrice * $requestedQty,
-            'currency'      => 'BDT',
-            'num_items'     => $requestedQty,
-            // ⭐ contents array — browser pixel এর সাথে match করতে (Facebook deduplication)
-            'contents'      => [['id' => (string) $product->id, 'quantity' => $requestedQty, 'item_price' => $finalPrice]],
+            'content_ids'      => [(string) $product->id],
+            'content_name'     => strip_tags($product->name),
+            'content_type'     => 'product',
+            'value'            => $finalPrice * $requestedQty,
+            'currency'         => 'BDT',
+            'num_items'        => $requestedQty,
+            'contents'         => [['id' => (string) $product->id, 'quantity' => $requestedQty, 'item_price' => $finalPrice]],
+            // ⭐ Bhoorwear standard: content_category
+            'content_category' => optional($product->category)->name ?? '',
         ];
         $atcOptions = [
             'event_id'        => $atc_event_id,
@@ -424,13 +425,14 @@ $brands = Brand::where('status', 1)
         // AJAX/JSON: order_now হলে redirect URL JSON এ পাঠাতে হবে — নইলে ক্লায়েন্ট HTML/302 পেয়ে
         // data.success না মেনে ফর্ম আবার সাবমিট করে কার্টে ডাবল যোগ হয়।
         if ($request->ajax() || $request->wantsJson()) {
-            // ⭐ price ও qty return করা হচ্ছে — browser pixel DB price ব্যবহার করবে, DOM price না
+            // ⭐ price, qty, category return — browser pixel DB value ব্যবহার করবে
             $payload = [
-                'success'  => true,
-                'id'       => $product->id,
-                'event_id' => $atc_event_id,
-                'price'    => $finalPrice,
-                'qty'      => $requestedQty,
+                'success'   => true,
+                'id'        => $product->id,
+                'event_id'  => $atc_event_id,
+                'price'     => $finalPrice,
+                'qty'       => $requestedQty,
+                'category'  => optional($product->category)->name ?? '',
             ];
             if ($request->has('order_now')) {
                 $payload['redirect'] = route('customer.checkout');
@@ -935,12 +937,20 @@ $brands = Brand::where('status', 1)
         if (isset($_COOKIE['_fbp'])) $capiUserData['fbp'] = $_COOKIE['_fbp'];
         if (isset($_COOKIE['_fbc'])) $capiUserData['fbc'] = $_COOKIE['_fbc'];
         $vcPayload = [
-            'content_name'   => strip_tags($details->name),
-            'content_ids'    => [(string) $details->id],
-            'content_type'   => 'product',
-            'value'          => (float) ($details->new_price ?? $details->old_price ?? 0),
-            'currency'       => 'BDT',
+            'content_name'     => strip_tags($details->name),
+            'content_ids'      => [(string) $details->id],
+            'content_type'     => 'product',
+            'value'            => (float) ($details->new_price ?? $details->old_price ?? 0),
+            'currency'         => 'BDT',
             'content_category' => optional($details->category)->name ?? '',
+            // ⭐ Bhoorwear standard: contents, shipping, num_items
+            'contents'         => [[
+                'id'         => (string) $details->id,
+                'quantity'   => 1,
+                'item_price' => (float) ($details->new_price ?? $details->old_price ?? 0),
+            ]],
+            'shipping'         => 0,
+            'num_items'        => 1,
         ];
         $vcOptions = [
             'event_id'        => $vc_event_id,
@@ -1160,6 +1170,13 @@ $brands = Brand::where('status', 1)
             'value'        => (float) (optional($products->first())->new_price ?? 0),
             'currency'     => 'BDT',
             'num_items'    => $products->count(),
+            // ⭐ Bhoorwear standard: contents, shipping
+            'contents'     => $products->map(fn($p) => [
+                'id'         => (string) $p->id,
+                'quantity'   => 1,
+                'item_price' => (float) ($p->new_price ?? $p->old_price ?? 0),
+            ])->values()->toArray(),
+            'shipping'     => 0,
         ];
         $campOptions = [
             'event_id'        => $fb_view_content_event_id,

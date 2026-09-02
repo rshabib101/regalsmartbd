@@ -225,6 +225,10 @@
                             <i class="far fa-copy" id="copyXmlIcon"></i>
                             <span id="copyXmlText">Copy XML</span>
                         </button>
+                        <a href="{{ route('admin.facebook_catalog.download_xml') }}" class="btn-download-csv" style="background:#059669;">
+                            <i class="fas fa-download"></i>
+                            <span>Download XML</span>
+                        </a>
                         <a href="{{ url('facebook-catalog.xml') }}" target="_blank" class="btn-download-csv" style="background:#4b5563;">
                             <i class="fas fa-external-link-alt"></i>
                             <span>View XML</span>

@@ -92,7 +92,8 @@
                 s.parentNode.insertBefore(t, s);
             })(window, document, "script", "https://connect.facebook.net/en_US/fbevents.js");
             fbq("init", "{{{$pixel->code}}}", @json(!empty($fbUserData) ? $fbUserData : (object)[]));
-            fbq("track", "PageView");
+            {{-- ⭐ eventID দিয়ে PageView — server CAPI এর সাথে deduplication হবে --}}
+            fbq("track", "PageView", {}, { eventID: "{{ $fb_pv_event_id ?? ('pv_' . uniqid()) }}" });
         </script>
         <noscript>
             <img height="1" width="1" style="display: none;" src="https://www.facebook.com/tr?id={{{$pixel->code}}}&ev=PageView&noscript=1" />
@@ -2016,13 +2017,15 @@ document.getElementById("chatToggle").addEventListener("click", function() {
                 window.dataLayer.push({ event: 'add_to_cart', ecommerce: { currency: 'BDT', value: price * qty, items: [item] } });
                 if (typeof fbq === 'function') {
                     fbq('track', 'AddToCart', {
-                        content_ids: [String(id)],
-                        content_name: name,
-                        content_type: 'product',
-                        value: price * qty,
-                        currency: 'BDT',
-                        num_items: qty,
-                        contents: [{ id: String(id), quantity: qty, item_price: price }]
+                        content_ids:      [String(id)],
+                        content_name:     name,
+                        content_type:     'product',
+                        value:            price * qty,
+                        currency:         'BDT',
+                        num_items:        qty,
+                        contents:         [{ id: String(id), quantity: qty, item_price: price }],
+                        // ⭐ Bhoorwear standard
+                        content_category: category || ''
                     }, { eventID: eventId });
                 }
                 if (typeof ttq !== 'undefined') ttq.track('AddToCart', { content_type: 'product', content_id: String(id), content_name: name, value: price * qty, currency: 'BDT', quantity: qty });
@@ -2045,10 +2048,11 @@ document.getElementById("chatToggle").addEventListener("click", function() {
                         dataType: "json",
                         success: function (data) {
                             if (data) {
-                                // ⭐ DB price ব্যবহার — DOM price বাদ (browser-server value match)
-                                var serverPrice = (data && data.price) ? parseFloat(data.price) : price;
-                                var serverQty   = (data && data.qty)   ? parseInt(data.qty)     : qty;
-                                fireAddToCartEvent(null, id, serverQty, name, serverPrice, category, (data && data.event_id) ? data.event_id : eventId);
+                                // ⭐ DB price, category ব্যবহার — DOM থেকে নয় (browser-server match)
+                                var serverPrice    = (data && data.price)    ? parseFloat(data.price)    : price;
+                                var serverQty      = (data && data.qty)      ? parseInt(data.qty)        : qty;
+                                var serverCategory = (data && data.category) ? data.category             : category;
+                                fireAddToCartEvent(null, id, serverQty, name, serverPrice, serverCategory, (data && data.event_id) ? data.event_id : eventId);
                                 toastr.success('কার্টে যোগ হয়েছে!', 'সফল');
                                 cart_count();
                                 mobile_cart();
@@ -2087,10 +2091,11 @@ document.getElementById("chatToggle").addEventListener("click", function() {
                     headers: { 'X-Requested-With': 'XMLHttpRequest' },
                     success: function (data) {
                         if (data && data.success) {
-                            // ⭐ DB price ব্যবহার — DOM price বাদ (browser-server value match)
-                            var serverPrice = (data && data.price) ? parseFloat(data.price) : price;
-                            var serverQty   = (data && data.qty)   ? parseInt(data.qty)     : qty;
-                            fireAddToCartEvent(null, id, serverQty, name, serverPrice, category, (data && data.event_id) ? data.event_id : eventId);
+                            // ⭐ DB price, category ব্যবহার — DOM থেকে নয় (browser-server match)
+                            var serverPrice    = (data && data.price)    ? parseFloat(data.price)    : price;
+                            var serverQty      = (data && data.qty)      ? parseInt(data.qty)        : qty;
+                            var serverCategory = (data && data.category) ? data.category             : category;
+                            fireAddToCartEvent(null, id, serverQty, name, serverPrice, serverCategory, (data && data.event_id) ? data.event_id : eventId);
                             toastr.success('কার্টে যোগ হয়েছে!', 'সফল');
                             cart_count();
                             mobile_cart();

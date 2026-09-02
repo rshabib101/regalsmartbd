@@ -187,6 +187,107 @@
         border-radius: 50%;
     }
 
+    /* ================================================================
+       DELIVERY AREA RADIO CARDS (SCREENSHOT MATCH)
+    ================================================================ */
+    .delivery-area-group {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 6px;
+    }
+
+    .delivery-area-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #ffffff;
+        border: 1.5px solid #e7e5e4;
+        border-radius: 12px;
+        padding: 14px 20px;
+        margin-bottom: 0;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        user-select: none;
+        position: relative;
+    }
+
+    .delivery-area-card:hover {
+        border-color: #cbd5e1;
+        background-color: #fafaf9;
+    }
+
+    .delivery-area-card.active,
+    .delivery-area-card:has(input[type="radio"]:checked) {
+        border-color: #14532d;
+        background-color: #fcfdfc;
+        box-shadow: 0 2px 8px rgba(20, 83, 45, 0.08);
+    }
+
+    .delivery-area-card input[type="radio"] {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .delivery-area-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    /* Radio Circle */
+    .delivery-area-radio {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 2px solid #d6d3d1;
+        background: #ffffff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        transition: all 0.2s ease;
+    }
+
+    .delivery-area-radio::after {
+        content: '';
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #14532d;
+        opacity: 0;
+        transform: scale(0.4);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .delivery-area-card.active .delivery-area-radio,
+    .delivery-area-card:has(input[type="radio"]:checked) .delivery-area-radio {
+        border-color: #14532d;
+    }
+
+    .delivery-area-card.active .delivery-area-radio::after,
+    .delivery-area-card:has(input[type="radio"]:checked) .delivery-area-radio::after {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    /* Labels */
+    .delivery-area-name {
+        font-size: 15px;
+        font-weight: 600;
+        color: #14532d;
+        line-height: 1.3;
+    }
+
+    .delivery-area-price {
+        font-size: 15px;
+        font-weight: 700;
+        color: #14532d;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+    }
+
     /* --- Cart Items (Scrollable) --- */
     .sticky-sidebar {
         position: sticky;
@@ -426,17 +527,19 @@
         $cartItemsForJs = [];
         $hasDigital = false;
         foreach (Cart::instance('shopping')->content() as $item) {
-            $p = \App\Models\Product::find($item->id);
+            $p = \App\Models\Product::with('category')->find($item->id);
             if ($p && $p->is_digital == 1) { $hasDigital = true; }
             $cartItemsForJs[] = [
-                'id'    => $item->id,
-                'name'  => $item->name,
-                'qty'   => $item->qty,
-                'price' => (float) $item->price,
-                'image' => asset($item->options->image ?? ''),
-                'link'  => isset($item->options->slug) ? url('/product/' . $item->options->slug) : '#',
-                'is_digital' => (int) ($p->is_digital ?? 0),
+                'id'            => $item->id,
+                'name'          => $item->name,
+                'qty'           => $item->qty,
+                'price'         => (float) $item->price,
+                'image'         => asset($item->options->image ?? ''),
+                'link'          => isset($item->options->slug) ? url('/product/' . $item->options->slug) : '#',
+                'is_digital'    => (int) ($p->is_digital ?? 0),
                 'free_delivery' => (int) ($p->free_delivery ?? 0),
+                // ⭐ Bhoorwear standard: category
+                'category'      => optional($p?->category)->name ?? '',
             ];
         }
 
@@ -490,15 +593,24 @@
                                     <div class="form-group">
                                         <label class="form-label-custom">ডেলিভারি এরিয়া *</label>
                                         @if($requires_shipping)
-                                            <select id="area" class="form-control-custom select2" name="area" required>
-                                                <option value="">এরিয়া নির্বাচন করুন...</option>
+                                            <div class="delivery-area-group">
+                                                @php
+                                                    $selectedShippingId = Session::get('shipping_id') ?: ($shippingcharge->first()->id ?? null);
+                                                @endphp
                                                 @foreach ($shippingcharge as $value)
-                                                    <option value="{{ $value->id }}" data-charge="{{ $value->amount }}"
-                                                        {{ Session::get('shipping_id') == $value->id ? 'selected' : '' }}>
-                                                        {{ $value->name }}
-                                                    </option>
+                                                    @php
+                                                        $isChecked = ($selectedShippingId == $value->id) || ($loop->first && !$selectedShippingId);
+                                                    @endphp
+                                                    <label class="delivery-area-card {{ $isChecked ? 'active' : '' }}">
+                                                        <div class="delivery-area-left">
+                                                            <input type="radio" name="area" value="{{ $value->id }}" data-charge="{{ $value->amount }}" data-name="{{ $value->name }}" {{ $isChecked ? 'checked' : '' }} required>
+                                                            <span class="delivery-area-radio"></span>
+                                                            <span class="delivery-area-name">{{ $value->name }}</span>
+                                                        </div>
+                                                        <span class="delivery-area-price">{{ round($value->amount) }} TK</span>
+                                                    </label>
                                                 @endforeach
-                                            </select>
+                                            </div>
                                         @else
                                             <input type="text" class="form-control-custom" value="Digital Product (No Shipping Charge)" readonly disabled style="background:#f3f4f6">
                                             <input type="hidden" name="area" value="free_shipping"> 
@@ -855,11 +967,15 @@
         }
 
         // এরিয়া পরিবর্তন হলে শিপিং চার্জ আপডেট
-        $('#area').on('change', function () {
-            var selectedCharge = parseFloat($('option:selected', this).attr('data-charge')) || 0;
+        $(document).on('change', 'input[name="area"]', function () {
+            var selectedCharge = parseFloat($(this).attr('data-charge')) || 0;
             
+            // Highlight active card
+            $('.delivery-area-card').removeClass('active');
+            $(this).closest('.delivery-area-card').addClass('active');
+
             // ⭐ Free Delivery Check - যদি সব প্রোডাক্ট free delivery eligible হয়, shipping charge 0
-            var isFreeDelivery = checkFreeDelivery();
+            var isFreeDelivery = typeof checkFreeDelivery === 'function' ? checkFreeDelivery() : false;
             var shippingCharge = isFreeDelivery ? 0 : selectedCharge;
             
             var grandTotal = baseSubtotal + shippingCharge - baseDiscount;
@@ -946,7 +1062,7 @@
                 }
 
                 // ক্যালকুলেশন
-                var selectedCharge = parseFloat($('#area option:selected').attr('data-charge')) || 0;
+                var selectedCharge = parseFloat($('input[name="area"]:checked').attr('data-charge')) || 0;
                 // ⭐ Free Delivery Check
                 var isFreeDelivery = checkFreeDelivery();
                 var shippingCharge = isFreeDelivery ? 0 : selectedCharge;
@@ -983,7 +1099,7 @@
             var phone = $('input[name="phone"]').val();
             var address = $('input[name="address"]').val();
             if (!name || !phone || !address) return;
-            var selectedCharge = parseFloat($('#area option:selected').attr('data-charge')) || 0;
+            var selectedCharge = parseFloat($('input[name="area"]:checked').attr('data-charge')) || 0;
             var isFreeDelivery = typeof checkFreeDelivery === 'function' ? checkFreeDelivery() : false;
             var shippingCharge = isFreeDelivery ? 0 : selectedCharge;
             var total = (baseSubtotal + shippingCharge - baseDiscount).toFixed(2);
@@ -1072,15 +1188,21 @@
         // Facebook Pixel: InitiateCheckout (deduplicated with CAPI)
         // ⭐ value = subtotal only (shipping বাদ) — Facebook best practice
         if (typeof fbq === "function" && items.length) {
+            var firstItem = items[0];
             fbq("track", "InitiateCheckout", {
-                value: subtotal,
-                currency: "BDT",
-                num_items: items.length,
-                content_ids: items.map(function(i){ return String(i.id); }),
-                contents: items.map(function(i){
-                    return {id: String(i.id), quantity: i.qty, item_price: i.price};
+                value:            subtotal,
+                currency:         "BDT",
+                num_items:        items.reduce(function(s,i){ return s + i.qty; }, 0),
+                content_ids:      items.map(function(i){ return String(i.id); }),
+                content_type:     'product',
+                // ⭐ Bhoorwear standard: title field inside contents
+                contents:         items.map(function(i){
+                    return { id: String(i.id), quantity: i.qty, item_price: i.price, title: i.name };
                 }),
-                content_type: 'product'
+                // ⭐ Bhoorwear standard: content_name, content_category, shipping
+                content_name:     firstItem.name || '',
+                content_category: firstItem.category || '',
+                shipping:         0
             }, { eventID: icoEventId });
         }
 
@@ -1139,9 +1261,9 @@
             });
 
             // GA4: add_shipping_info when delivery area is selected
-            $('#area').on('change', function() {
-                var selectedText = $(this).find('option:selected').text().trim();
-                if (selectedText && selectedText !== 'এরিয়া নির্বাচন করুন...') {
+            $(document).on('change', 'input[name="area"]', function() {
+                var selectedText = $(this).attr('data-name') || $(this).closest('.delivery-area-card').find('.delivery-area-name').text().trim();
+                if (selectedText) {
                     window.dataLayer = window.dataLayer || [];
                     window.dataLayer.push({ ecommerce: null });
                     window.dataLayer.push({

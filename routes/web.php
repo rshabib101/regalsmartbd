@@ -867,6 +867,7 @@ Route::get('dashboard', [DashboardController::class, 'dashboard'])->name('admin.
     // Facebook Product Catalog Data Feed settings
     Route::get('facebook-catalog/settings', [FacebookCatalogController::class, 'index'])->name('admin.facebook_catalog.index');
     Route::get('facebook-catalog/download', [FacebookCatalogController::class, 'download'])->name('admin.facebook_catalog.download');
+    Route::get('facebook-catalog/download-xml', [FacebookCatalogController::class, 'xmlDownload'])->name('admin.facebook_catalog.download_xml');
 
     // Ads Analytics - separate pages for each platform
     Route::get('ads-analytics', [AdsAnalyticsController::class, 'dashboard'])->name('admin.ads_analytics.dashboard');

@@ -43,7 +43,8 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\View\Middleware\ShareErrorsFromSession::class,
             \App\Http\Middleware\VerifyCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            // ❌ এখান থেকে AppSessionHandler সরিয়ে উপরে Global-এ নেওয়া হয়েছে
+            // ⭐ Facebook CAPI Server-Side PageView (non-blocking, runs after response)
+            \App\Http\Middleware\FacebookServerPageView::class,
         ]);
 
         // =================================================================

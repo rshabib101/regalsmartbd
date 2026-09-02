@@ -323,9 +323,21 @@ class FacebookCapiService
             $prepared['num_items'] = (int) $data['num_items'];
         }
 
+        // Shipping (for ViewContent, Purchase)
+        if (isset($data['shipping'])) {
+            $prepared['shipping'] = (float) $data['shipping'];
+        }
+
         // Order ID (for Purchase events)
         if (isset($data['order_id'])) {
             $prepared['order_id'] = (string) $data['order_id'];
+        }
+
+        // Transaction ID (for Purchase events)
+        if (isset($data['transaction_id'])) {
+            $prepared['transaction_id'] = (string) $data['transaction_id'];
+        } elseif (isset($data['order_id'])) {
+            $prepared['transaction_id'] = (string) $data['order_id'];
         }
 
         // Search string (for Search events)
@@ -336,6 +348,17 @@ class FacebookCapiService
         // Status (for Purchase events)
         if (isset($data['status'])) {
             $prepared['status'] = $data['status'];
+        }
+
+        // PageView — page_title, referrer, page_url
+        if (isset($data['page_title'])) {
+            $prepared['page_title'] = (string) $data['page_title'];
+        }
+        if (isset($data['referrer'])) {
+            $prepared['referrer'] = (string) $data['referrer'];
+        }
+        if (isset($data['page_url'])) {
+            $prepared['page_url'] = (string) $data['page_url'];
         }
 
         return $prepared;
@@ -429,6 +452,15 @@ class FacebookCapiService
     public function sendSearch($data, $userData = [], $options = [])
     {
         return $this->sendEvent('Search', $data, $userData, $options);
+    }
+
+    /**
+     * Send PageView event (server-side CAPI)
+     * custom_data এ: page_title, referrer, page_url
+     */
+    public function sendPageView($data = [], $userData = [], $options = [])
+    {
+        return $this->sendEvent('PageView', $data, $userData, $options);
     }
 
     /**

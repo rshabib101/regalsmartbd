@@ -50,12 +50,16 @@ window.dataLayer.push({
 
 if (typeof fbq === 'function') {
     fbq('track', 'ViewContent', {
-        content_ids: ['{{ $details->id }}'],
-        content_name: @json($details->name),
+        content_ids:      ['{{ $details->id }}'],
+        content_name:     @json($details->name),
         content_category: @json(optional($details->category)->name ?? ''),
-        content_type: 'product',
-        value: {{ (float) $displayPrice }},
-        currency: 'BDT'
+        content_type:     'product',
+        value:            {{ (float) $displayPrice }},
+        currency:         'BDT',
+        // ⭐ Bhoorwear standard: contents, shipping, num_items
+        contents:  [{ id: '{{ $details->id }}', quantity: 1, item_price: {{ (float) $displayPrice }} }],
+        shipping:  0,
+        num_items: 1
     }, { eventID: '{{ $vc_event_id ?? ("vc_prod_".$details->id."_".time()) }}' });
 }
 if (typeof ttq !== 'undefined') {

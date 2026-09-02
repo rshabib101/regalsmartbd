@@ -373,18 +373,28 @@
         @if($sha256Phone) amData.ph = '{{ $sha256Phone }}'; @endif
         @if($sha256Email) amData.em = '{{ $sha256Email }}'; @endif
         @if($sha256Name)  amData.fn = '{{ $sha256Name }}'; @endif
+        @if(!empty($custArea)) amData.ct = '{{ hash("sha256", strtolower(trim($custArea))) }}'; @endif
+        @if(!empty($order->customer_id)) amData.external_id = '{{ hash("sha256", (string)$order->customer_id) }}'; @endif
+        amData.country = '{{ hash("sha256", "bd") }}';
         if (Object.keys(amData).length > 0) {
             fbq('setUserProperties', amData);
         }
 
+        var firstItem = purchaseItems.length > 0 ? purchaseItems[0] : {};
+        var totalQty  = purchaseItems.reduce(function(sum, i){ return sum + (parseInt(i.quantity) || 1); }, 0);
+
         fbq('track', 'Purchase', {
-            value:        grandTotal,
-            currency:     'BDT',
-            content_ids:  purchaseItems.map(function(i){ return i.item_id; }),
-            contents:     purchaseItems.map(function(i){ return { id: i.item_id, quantity: i.quantity, item_price: i.price }; }),
-            content_type: 'product',
-            num_items:    purchaseItems.length,
-            order_id:     orderId
+            value:            grandTotal,
+            currency:         'BDT',
+            content_ids:      purchaseItems.map(function(i){ return i.item_id; }),
+            contents:         purchaseItems.map(function(i){ return { id: i.item_id, quantity: i.quantity, item_price: i.price, title: i.item_name }; }),
+            content_type:     'product',
+            num_items:        totalQty,
+            order_id:         orderId,
+            transaction_id:   orderId,
+            shipping:         shippingCharge,
+            content_name:     firstItem.item_name || '',
+            content_category: firstItem.item_category || ''
         }, { eventID: eventId });
     }
 

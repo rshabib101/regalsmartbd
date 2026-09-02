@@ -118,65 +118,45 @@ class FacebookCatalogController extends Controller
             $imagePath = $product->image?->image ?? '';
             $imageUrl  = $this->resolveImageUrl($imagePath);
 
-            $hasVariants = $product->variantPrices && $product->variantPrices->count() > 0;
+            $oldPrice = (float)($product->old_price ?? 0);
+            $newPrice = (float)($product->new_price ?? 0);
 
-            if ($hasVariants) {
-                foreach ($product->variantPrices as $vp) {
-                    $variantPrice = (float)($vp->price > 0 ? $vp->price : ($product->new_price ?? 0));
-                    $oldPrice     = (float)($product->old_price ?? 0);
-                    $inStock      = ($vp->stock > 0 || ($vp->stock === null && $product->stock > 0));
-                    $sizeName     = $vp->size?->sizeName ?: '';
-                    $colorName    = $vp->color?->colorName ?: '';
-                    $variantTitle = $product->name . ($sizeName ? " - {$sizeName}" : '') . ($colorName ? " - {$colorName}" : '');
-
-                    $xml .= '<item>' . "\n";
-                    $xml .= '<g:id>' . htmlspecialchars($product->id . '_' . $vp->id, ENT_XML1) . '</g:id>' . "\n";
-                    $xml .= '<g:item_group_id>' . htmlspecialchars((string)$product->id, ENT_XML1) . '</g:item_group_id>' . "\n";
-                    $xml .= '<title>' . htmlspecialchars($variantTitle, ENT_XML1) . '</title>' . "\n";
-                    $xml .= '<description>' . htmlspecialchars($cleanDesc, ENT_XML1) . '</description>' . "\n";
-                    $xml .= '<link>' . htmlspecialchars($prodLink, ENT_XML1) . '</link>' . "\n";
-                    $xml .= '<g:image_link>' . htmlspecialchars($imageUrl, ENT_XML1) . '</g:image_link>' . "\n";
-                    $xml .= '<g:brand>' . htmlspecialchars($brandName, ENT_XML1) . '</g:brand>' . "\n";
-                    $xml .= '<g:condition>new</g:condition>' . "\n";
-                    $xml .= '<g:availability>' . ($inStock ? 'in stock' : 'out of stock') . '</g:availability>' . "\n";
-                    if ($oldPrice > $variantPrice && $variantPrice > 0) {
-                        $xml .= '<g:price>' . round($oldPrice) . ' BDT</g:price>' . "\n";
-                        $xml .= '<g:sale_price>' . round($variantPrice) . ' BDT</g:sale_price>' . "\n";
-                    } else {
-                        $xml .= '<g:price>' . round($variantPrice) . ' BDT</g:price>' . "\n";
-                    }
-                    if ($sizeName) $xml .= '<g:size>' . htmlspecialchars($sizeName, ENT_XML1) . '</g:size>' . "\n";
-                    if ($colorName) $xml .= '<g:color>' . htmlspecialchars($colorName, ENT_XML1) . '</g:color>' . "\n";
-                    $xml .= '<g:product_type>' . htmlspecialchars($catName, ENT_XML1) . '</g:product_type>' . "\n";
-                    $xml .= '</item>' . "\n";
+            if ($newPrice <= 0 && $product->variantPrices && $product->variantPrices->count() > 0) {
+                $firstVp = $product->variantPrices->where('price', '>', 0)->first();
+                if ($firstVp) {
+                    $newPrice = (float)$firstVp->price;
                 }
-            } else {
-                $price    = (float)($product->new_price ?? 0);
-                $oldPrice = (float)($product->old_price ?? 0);
-                $inStock  = ($product->stock > 0);
-
-                $xml .= '<item>' . "\n";
-                $xml .= '<g:id>' . htmlspecialchars((string)$product->id, ENT_XML1) . '</g:id>' . "\n";
-                $xml .= '<g:item_group_id>' . htmlspecialchars((string)$product->id, ENT_XML1) . '</g:item_group_id>' . "\n";
-                $xml .= '<title>' . htmlspecialchars($product->name, ENT_XML1) . '</title>' . "\n";
-                $xml .= '<description>' . htmlspecialchars($cleanDesc, ENT_XML1) . '</description>' . "\n";
-                $xml .= '<link>' . htmlspecialchars($prodLink, ENT_XML1) . '</link>' . "\n";
-                $xml .= '<g:image_link>' . htmlspecialchars($imageUrl, ENT_XML1) . '</g:image_link>' . "\n";
-                $xml .= '<g:brand>' . htmlspecialchars($brandName, ENT_XML1) . '</g:brand>' . "\n";
-                $xml .= '<g:condition>new</g:condition>' . "\n";
-                $xml .= '<g:availability>' . ($inStock ? 'in stock' : 'out of stock') . '</g:availability>' . "\n";
-                if ($oldPrice > $price && $price > 0) {
-                    $xml .= '<g:price>' . round($oldPrice) . ' BDT</g:price>' . "\n";
-                    $xml .= '<g:sale_price>' . round($price) . ' BDT</g:sale_price>' . "\n";
-                } else {
-                    $xml .= '<g:price>' . round($price > 0 ? $price : $oldPrice) . ' BDT</g:price>' . "\n";
-                }
-                if ($product->pro_unit) {
-                    $xml .= '<g:size>' . htmlspecialchars($product->pro_unit, ENT_XML1) . '</g:size>' . "\n";
-                }
-                $xml .= '<g:product_type>' . htmlspecialchars($catName, ENT_XML1) . '</g:product_type>' . "\n";
-                $xml .= '</item>' . "\n";
             }
+
+            $inStock = ($product->stock > 0);
+            if ($product->variantPrices && $product->variantPrices->count() > 0) {
+                $inStock = ($product->variantPrices->where('stock', '>', 0)->count() > 0) || ($product->stock > 0);
+            }
+
+            $xml .= '<item>' . "\n";
+            $xml .= '<g:id>' . htmlspecialchars((string)$product->id, ENT_XML1) . '</g:id>' . "\n";
+            $xml .= '<g:item_group_id>' . htmlspecialchars((string)$product->id, ENT_XML1) . '</g:item_group_id>' . "\n";
+            $xml .= '<title>' . htmlspecialchars($product->name, ENT_XML1) . '</title>' . "\n";
+            $xml .= '<description>' . htmlspecialchars($cleanDesc, ENT_XML1) . '</description>' . "\n";
+            $xml .= '<link>' . htmlspecialchars($prodLink, ENT_XML1) . '</link>' . "\n";
+            $xml .= '<g:image_link>' . htmlspecialchars($imageUrl, ENT_XML1) . '</g:image_link>' . "\n";
+            $xml .= '<g:brand>' . htmlspecialchars($brandName, ENT_XML1) . '</g:brand>' . "\n";
+            $xml .= '<g:condition>new</g:condition>' . "\n";
+            $xml .= '<g:availability>' . ($inStock ? 'in stock' : 'out of stock') . '</g:availability>' . "\n";
+
+            if ($oldPrice > $newPrice && $newPrice > 0) {
+                $xml .= '<g:price>' . round($oldPrice) . ' BDT</g:price>' . "\n";
+                $xml .= '<g:sale_price>' . round($newPrice) . ' BDT</g:sale_price>' . "\n";
+            } else {
+                $finalPrice = $newPrice > 0 ? $newPrice : ($oldPrice > 0 ? $oldPrice : 0);
+                $xml .= '<g:price>' . round($finalPrice) . ' BDT</g:price>' . "\n";
+            }
+
+            if ($product->pro_unit) {
+                $xml .= '<g:size>' . htmlspecialchars($product->pro_unit, ENT_XML1) . '</g:size>' . "\n";
+            }
+            $xml .= '<g:product_type>' . htmlspecialchars($catName, ENT_XML1) . '</g:product_type>' . "\n";
+            $xml .= '</item>' . "\n";
         }
 
         $xml .= '</channel>' . "\n";
@@ -199,7 +179,18 @@ class FacebookCatalogController extends Controller
     }
 
     /**
-     * Write single product or variant rows into the CSV stream.
+     * Download the XML file as an attachment.
+     */
+    public function xmlDownload()
+    {
+        $response = $this->xmlFeed();
+        $response->headers->set('Content-Disposition', 'attachment; filename="facebook_catalog_feed.xml"');
+        return $response;
+    }
+
+    /**
+     * Write single product rows into the CSV stream.
+     * Always uses (string)$product->id as 'id' to guarantee 100% Match Rate with Meta Pixel events.
      */
     protected function writeProductRows($handle, Product $product, string $siteName)
     {
@@ -235,84 +226,63 @@ class FacebookCatalogController extends Controller
         $brandName    = $product->brand?->name ?: $siteName;
         $categoryName = $product->category?->name ?: 'General';
 
-        // Check if product has modern variantPrices
-        $variantPrices = $product->variantPrices;
+        // Price calculation:
+        $oldPrice = (float)($product->old_price ?? 0);
+        $newPrice = (float)($product->new_price ?? 0);
 
-        if ($variantPrices && $variantPrices->count() > 0) {
-            foreach ($variantPrices as $vp) {
-                $variantPrice = (float)($vp->price > 0 ? $vp->price : ($product->new_price ?? 0));
-                $oldPrice     = (float)($product->old_price ?? 0);
-
-                if ($oldPrice > $variantPrice && $variantPrice > 0) {
-                    $priceStr     = round($oldPrice) . ' BDT';
-                    $salePriceStr = round($variantPrice) . ' BDT';
-                } else {
-                    $priceStr     = round($variantPrice) . ' BDT';
-                    $salePriceStr = round($variantPrice) . ' BDT';
-                }
-
-                $inStock      = ($vp->stock > 0 || ($vp->stock === null && $product->stock > 0));
-                $availability = $inStock ? 'in stock' : 'out of stock';
-                $sizeName     = $vp->size?->sizeName ?: '';
-                $colorName    = $vp->color?->colorName ?: '';
-                $title        = $product->name . ($sizeName ? " - {$sizeName}" : '') . ($colorName ? " - {$colorName}" : '');
-
-                fputcsv($handle, [
-                    'id'                      => $product->id . '_' . $vp->id,
-                    'title'                   => $title,
-                    'item_group_id'           => (string)$product->id,
-                    'description'             => $cleanDescription,
-                    'availability'            => $availability,
-                    'condition'               => $condition,
-                    'sku'                     => $sku . '-' . $vp->id,
-                    'price'                   => $priceStr,
-                    'sale_price'              => $salePriceStr,
-                    'link'                    => $productLink,
-                    'image_link'              => $imageUrl,
-                    'brand'                   => $brandName,
-                    'google_product_category' => $categoryName,
-                    'fb_product_category'     => $categoryName,
-                    'size'                    => $sizeName,
-                    'color'                   => $colorName,
-                    'additional_image_link'   => $additionalImagesStr,
-                ]);
+        if ($newPrice <= 0 && $product->variantPrices && $product->variantPrices->count() > 0) {
+            $firstVp = $product->variantPrices->where('price', '>', 0)->first();
+            if ($firstVp) {
+                $newPrice = (float)$firstVp->price;
             }
-        } else {
-            // Standalone Product
-            $oldPrice = (float)($product->old_price ?? 0);
-            $newPrice = (float)($product->new_price ?? 0);
-
-            if ($oldPrice > $newPrice && $newPrice > 0) {
-                $priceStr     = round($oldPrice) . ' BDT';
-                $salePriceStr = round($newPrice) . ' BDT';
-            } else {
-                $finalPrice   = $newPrice > 0 ? $newPrice : $oldPrice;
-                $priceStr     = round($finalPrice) . ' BDT';
-                $salePriceStr = round($finalPrice) . ' BDT';
-            }
-
-            $availability = ($product->stock > 0) ? 'in stock' : 'out of stock';
-
-            fputcsv($handle, [
-                'id'                      => (string)$product->id,
-                'title'                   => $product->name,
-                'item_group_id'           => (string)$product->id,
-                'description'             => $cleanDescription,
-                'availability'            => $availability,
-                'condition'               => $condition,
-                'sku'                     => $sku,
-                'price'                   => $priceStr,
-                'sale_price'              => $salePriceStr,
-                'link'                    => $productLink,
-                'image_link'              => $imageUrl,
-                'brand'                   => $brandName,
-                'google_product_category' => $categoryName,
-                'fb_product_category'     => $categoryName,
-                'size'                    => $product->pro_unit ?? '',
-                'color'                   => '',
-                'additional_image_link'   => $additionalImagesStr,
-            ]);
         }
+
+        if ($oldPrice > $newPrice && $newPrice > 0) {
+            $priceStr     = round($oldPrice) . ' BDT';
+            $salePriceStr = round($newPrice) . ' BDT';
+        } else {
+            $finalPrice   = $newPrice > 0 ? $newPrice : ($oldPrice > 0 ? $oldPrice : 0);
+            $priceStr     = round($finalPrice) . ' BDT';
+            $salePriceStr = ''; // Meta spec: empty if no discount
+        }
+
+        // Availability
+        $inStock = ($product->stock > 0);
+        if ($product->variantPrices && $product->variantPrices->count() > 0) {
+            $inStock = ($product->variantPrices->where('stock', '>', 0)->count() > 0) || ($product->stock > 0);
+        }
+        $availability = $inStock ? 'in stock' : 'out of stock';
+
+        // Size / Color from unit or variants
+        $sizeName  = $product->pro_unit ?? '';
+        $colorName = '';
+        if ($product->variantPrices && $product->variantPrices->count() > 0) {
+            $firstVp = $product->variantPrices->first();
+            if ($firstVp) {
+                $sizeName  = $firstVp->size?->sizeName ?: $sizeName;
+                $colorName = $firstVp->color?->colorName ?: '';
+            }
+        }
+
+        fputcsv($handle, [
+            'id'                      => (string)$product->id,
+            'title'                   => $product->name,
+            'item_group_id'           => (string)$product->id,
+            'description'             => $cleanDescription,
+            'availability'            => $availability,
+            'condition'               => $condition,
+            'sku'                     => $sku,
+            'price'                   => $priceStr,
+            'sale_price'              => $salePriceStr,
+            'link'                    => $productLink,
+            'image_link'              => $imageUrl,
+            'brand'                   => $brandName,
+            'google_product_category' => $categoryName,
+            'fb_product_category'     => $categoryName,
+            'size'                    => $sizeName,
+            'color'                   => $colorName,
+            'additional_image_link'   => $additionalImagesStr,
+        ]);
     }
 
     /**

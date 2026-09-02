@@ -126,14 +126,23 @@
             fbq('init', '{{{ $pixel->code }}}');
             @endforeach
             fbq('track', 'PageView', {}, {eventID: {{ json_encode('pv_camp'.$campaign_data->id.'_'.time()) }}});
-            fbq('track', 'ViewContent', {
-                content_name: {{ json_encode($camp_name) }},
-                content_ids:  {!! json_encode($products->pluck('id')->map(fn($id) => (string)$id)->values()->toArray()) !!},
-                content_type: 'product',
-                value:        {{ $camp_value }},
-                currency:     'BDT',
-                num_items:    {{ $products->count() }}
-            }, {eventID: {{ json_encode($fb_view_content_event_id) }}});
+            @php
+                $campPayload = [
+                    'content_name' => strip_tags($campaign_data->name),
+                    'content_ids'  => $products->pluck('id')->map(function($id) { return (string)$id; })->values()->toArray(),
+                    'content_type' => 'product',
+                    'value'        => (float) (optional($products->first())->new_price ?? 0),
+                    'currency'     => 'BDT',
+                    'num_items'    => $products->count(),
+                    'contents'     => $products->map(fn($p) => [
+                        'id'         => (string) $p->id,
+                        'quantity'   => 1,
+                        'item_price' => (float) ($p->new_price ?? $p->old_price ?? 0),
+                    ])->values()->toArray(),
+                    'shipping'     => 0,
+                ];
+            @endphp
+            fbq('track', 'ViewContent', {!! json_encode($campPayload) !!}, {eventID: {{ json_encode($fb_view_content_event_id) }}});
         </script>
         @foreach($pixels as $pixel)
         <noscript>
