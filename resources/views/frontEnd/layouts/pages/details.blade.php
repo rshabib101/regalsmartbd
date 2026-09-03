@@ -550,30 +550,178 @@ if (typeof ttq !== 'undefined') {
                                                                     <span class="plus">+</span>
                                                                 </div>
                                                             </div>
-                                                            <div class="d-flex single_product col-sm-12">
-                                                  <input type="submit" class="btn px-4 add_cart_btn" onclick="return sendSuccess();" name="add_cart" value="কার্টে যোগ করুন" />
-<input type="submit" class="btn px-4 order_now_btn order_now_btn_m" onclick="return sendSuccess();" name="order_now" value="অর্ডার করুন" />
+                                                            <div class="d-flex single_product col-sm-12 gap-2">
+                                                                 <button type="submit" class="btn add_cart_btn detail-add-cart-btn" onclick="return sendSuccess();" name="add_cart" value="add_cart">
+                                                                     <i class="fa-solid fa-cart-shopping me-1"></i> কার্টে যোগ করুন
+                                                                 </button>
+                                                                 <button type="submit" class="btn order_now_btn order_now_btn_m detail-order-btn" onclick="return sendSuccess();" name="order_now" value="order_now">
+                                                                     <i class="fa-solid fa-bolt me-1"></i> এখনই অর্ডার করুন
+                                                                 </button>
                                                             </div>
                                                         </div>
-                                                        <div class="mt-md-2 mt-2">
-                                                            <h4 class="font-weight-bold">
-                                                                <a class="btn btn-success w-100 call_now_btn"
-                                                                    href="tel: {{ $contact->hotline }}">
-                                                                    <i class="fa fa-phone-square"></i>
-                                                                    {{ $contact->hotline }}
-                                                                </a>
-                                                            </h4>
-                                                        </div>
-                                                       <div class="mt-md-2 mt-2">
-                                                        <h4 class="font-weight-bold">
-                                                            <a class="btn btn-success w-100 call_now_btn"
-                                                                href="https://api.whatsapp.com/send?phone={{ $contact->whatsapp }}&text=হ্যালো, আমি এই পণ্যটির ব্যাপারে জানতে চাই: {{ urlencode(Request::url()) }}"
-                                                                target="_blank">
-                                                                <i class="fa fa-whatsapp"></i>
-                                                                এই পণ্যটি সম্পর্কে জিজ্ঞাসা করুন
+
+                                                        {{-- Call Now Button --}}
+                                                        <div class="mt-2">
+                                                            <a class="detail-call-btn w-100"
+                                                                href="tel:{{ $contact->hotline }}">
+                                                                <i class="fas fa-phone-alt"></i>
+                                                                <span>হটলাইন: {{ $contact->hotline }}</span>
                                                             </a>
-                                                        </h4>
-                                                    </div>
+                                                        </div>
+
+                                                        {{-- WhatsApp Order Button --}}
+                                                        <div class="mt-2">
+                                                            <a class="detail-whatsapp-btn w-100"
+                                                                href="https://api.whatsapp.com/send?phone={{ $contact->whatsapp }}&text={{ urlencode('হ্যালো, আমি এই পণ্যটি অর্ডার করতে চাই: ' . $details->name . ' (মূল্য: ৳' . $displayPrice . ') - ' . Request::url()) }}"
+                                                                target="_blank" rel="noopener">
+                                                                <i class="fab fa-whatsapp"></i>
+                                                                <span>WhatsApp এ অর্ডার করুন</span>
+                                                            </a>
+                                                        </div>
+
+                                                        <style>
+                                                            /* ===== Eye-Catching Product Detail Action Buttons ===== */
+                                                            .single_product {
+                                                                display: flex;
+                                                                gap: 10px;
+                                                                margin-top: 10px;
+                                                            }
+                                                            .detail-add-cart-btn, .detail-order-btn {
+                                                                font-weight: 700 !important;
+                                                                font-size: 15px !important;
+                                                                border-radius: 12px !important;
+                                                                padding: 13px 16px !important;
+                                                                border: none !important;
+                                                                display: inline-flex !important;
+                                                                align-items: center !important;
+                                                                justify-content: center !important;
+                                                                gap: 8px !important;
+                                                                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                                                                flex: 1;
+                                                                cursor: pointer;
+                                                                text-decoration: none;
+                                                                letter-spacing: 0.2px;
+                                                            }
+                                                            /* Order Now Button: High-converting Vivid Coral-Red with Glow */
+                                                            .detail-order-btn {
+                                                                background: linear-gradient(135deg, #ff334b, #ff5e36) !important;
+                                                                color: #ffffff !important;
+                                                                box-shadow: 0 6px 20px rgba(255, 51, 75, 0.42) !important;
+                                                                position: relative;
+                                                                overflow: hidden;
+                                                            }
+                                                            .detail-order-btn:hover {
+                                                                background: linear-gradient(135deg, #ff1f3a, #ff4c20) !important;
+                                                                transform: translateY(-2px) scale(1.01) !important;
+                                                                box-shadow: 0 8px 25px rgba(255, 51, 75, 0.6) !important;
+                                                                color: #ffffff !important;
+                                                            }
+                                                            .detail-order-btn:active {
+                                                                transform: translateY(0) scale(0.98) !important;
+                                                            }
+
+                                                            /* Add To Cart Button: Deep Indigo/Blue */
+                                                            .detail-add-cart-btn {
+                                                                background: linear-gradient(135deg, #4f46e5, #6366f1) !important;
+                                                                color: #ffffff !important;
+                                                                box-shadow: 0 6px 20px rgba(79, 70, 229, 0.38) !important;
+                                                            }
+                                                            .detail-add-cart-btn:hover {
+                                                                background: linear-gradient(135deg, #4338ca, #4f46e5) !important;
+                                                                transform: translateY(-2px) scale(1.01) !important;
+                                                                box-shadow: 0 8px 25px rgba(79, 70, 229, 0.55) !important;
+                                                                color: #ffffff !important;
+                                                            }
+                                                            .detail-add-cart-btn:active {
+                                                                transform: translateY(0) scale(0.98) !important;
+                                                            }
+
+                                                            /* Call Button: Clean Emerald Gradient */
+                                                            .detail-call-btn {
+                                                                display: flex;
+                                                                align-items: center;
+                                                                justify-content: center;
+                                                                gap: 10px;
+                                                                background: linear-gradient(135deg, #059669, #10b981);
+                                                                color: #ffffff !important;
+                                                                font-size: 16px;
+                                                                font-weight: 700;
+                                                                padding: 13px 20px;
+                                                                border-radius: 12px;
+                                                                text-decoration: none;
+                                                                box-shadow: 0 4px 16px rgba(5, 150, 105, 0.32);
+                                                                transition: all 0.3s ease;
+                                                            }
+                                                            .detail-call-btn:hover {
+                                                                transform: translateY(-2px);
+                                                                box-shadow: 0 8px 22px rgba(5, 150, 105, 0.48);
+                                                                color: #ffffff;
+                                                            }
+                                                            .detail-call-btn:hover i {
+                                                                animation: phoneShake 0.5s ease-in-out;
+                                                            }
+
+                                                            /* WhatsApp Order Button: Official WhatsApp Gradient with Soft Pulse */
+                                                            .detail-whatsapp-btn {
+                                                                display: flex;
+                                                                align-items: center;
+                                                                justify-content: center;
+                                                                gap: 10px;
+                                                                background: linear-gradient(135deg, #25D366, #128C7E);
+                                                                color: #ffffff !important;
+                                                                font-size: 16.5px;
+                                                                font-weight: 700;
+                                                                padding: 13px 20px;
+                                                                border-radius: 12px;
+                                                                text-decoration: none;
+                                                                box-shadow: 0 6px 20px rgba(37, 211, 102, 0.4);
+                                                                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                                                                animation: waPulse 2.5s infinite;
+                                                            }
+                                                            .detail-whatsapp-btn i {
+                                                                font-size: 22px;
+                                                            }
+                                                            .detail-whatsapp-btn:hover {
+                                                                transform: translateY(-2px) scale(1.01);
+                                                                box-shadow: 0 8px 26px rgba(37, 211, 102, 0.65);
+                                                                color: #ffffff;
+                                                                animation: none;
+                                                            }
+                                                            .detail-whatsapp-btn:active {
+                                                                transform: translateY(0) scale(0.98);
+                                                            }
+
+                                                            @keyframes waPulse {
+                                                                0%, 100% {
+                                                                    box-shadow: 0 6px 20px rgba(37, 211, 102, 0.4);
+                                                                }
+                                                                50% {
+                                                                    box-shadow: 0 6px 28px rgba(37, 211, 102, 0.7);
+                                                                }
+                                                            }
+                                                            @keyframes phoneShake {
+                                                                0%, 100% { transform: rotate(0); }
+                                                                20%, 60% { transform: rotate(-15deg); }
+                                                                40%, 80% { transform: rotate(15deg); }
+                                                            }
+
+                                                            /* Mobile Tweaks */
+                                                            @media (max-width: 576px) {
+                                                                .detail-add-cart-btn, .detail-order-btn {
+                                                                    font-size: 13.5px !important;
+                                                                    padding: 11px 8px !important;
+                                                                    border-radius: 10px !important;
+                                                                }
+                                                                .detail-whatsapp-btn, .detail-call-btn {
+                                                                    font-size: 14.5px !important;
+                                                                    padding: 11px 16px !important;
+                                                                    border-radius: 10px !important;
+                                                                }
+                                                                .detail-whatsapp-btn i {
+                                                                    font-size: 19px !important;
+                                                                }
+                                                            }
+                                                        </style>
 
                                                         <div class="mt-md-2 mt-2">
                                                             <div class="del_charge_area">

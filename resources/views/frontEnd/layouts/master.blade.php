@@ -1295,26 +1295,31 @@
 }
 </style>
         
-<!-- ЁЯМР Floating Chat Widget -->
-<div class="chat-widget">
-  <!-- Main Toggle Button -->
-  <div class="chat-toggle" id="chatToggle">
-    <i class="fas fa-comment-dots"></i>
-  </div>
-
-  <!-- Chat Options -->
+<!-- 💬 Floating Chat Widget -->
+<div class="chat-widget" id="chatWidget">
+  <!-- Chat Options (উপরে আসবে) -->
   <div class="chat-options" id="chatOptions">
-          <a href="https://m.me/{{$generalsetting->facebook_page_username}}" target="_blank" class="chat-btn messenger" title="Messenger">
+    @if(optional($generalsetting)->facebook_page_username)
+    <a href="https://m.me/{{$generalsetting->facebook_page_username}}" target="_blank" class="chat-btn messenger" title="Messenger">
       <i class="fab fa-facebook-messenger"></i>
     </a>
-          <a href="https://wa.me/{{ $contact->whatsapp }}" target="_blank" class="chat-btn whatsapp" title="WhatsApp">
+    @endif
+    @if(optional($contact)->whatsapp)
+    <a href="https://wa.me/{{ $contact->whatsapp }}" target="_blank" class="chat-btn whatsapp" title="WhatsApp">
       <i class="fab fa-whatsapp"></i>
     </a>
+    @endif
+    @if(optional($contact)->hotline)
     <a href="tel:{{$contact->hotline}}" class="chat-btn hotline" title="Hotline">
       <i class="fas fa-phone"></i>
     </a>
+    @endif
+  </div>
 
-
+  <!-- Main Toggle Button -->
+  <div class="chat-toggle" id="chatToggle" title="Chat & Call">
+    <i class="fas fa-comment-dots chat-icon-main"></i>
+    <i class="fas fa-times chat-icon-close"></i>
   </div>
 </div>
 
@@ -1325,7 +1330,7 @@
 /* Floating Container */
 .chat-widget {
   position: fixed;
-  bottom: 60px; /* ⬅ Chat icon এখন 55px উপরে */
+  bottom: 60px;
   right: 25px;
   z-index: 9999;
   display: flex;
@@ -1335,6 +1340,7 @@
 
 /* Main Toggle Button */
 .chat-toggle {
+  position: relative;
   background: linear-gradient(135deg, #25D366, #128C7E);
   color: #fff;
   width: 60px;
@@ -1345,11 +1351,40 @@
   justify-content: center;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
   cursor: pointer;
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
   font-size: 26px;
+  user-select: none;
 }
 .chat-toggle:hover {
-  transform: scale(1.1);
+  transform: scale(1.08);
+}
+.chat-toggle .chat-icon-main,
+.chat-toggle .chat-icon-close {
+  position: absolute;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  pointer-events: none;
+}
+.chat-toggle .chat-icon-main {
+  transform: rotate(0deg) scale(1);
+  opacity: 1;
+}
+.chat-toggle .chat-icon-close {
+  transform: rotate(-90deg) scale(0.3);
+  opacity: 0;
+}
+
+/* When Toggle is Open: Turns Red & Shows Cross (X) Icon */
+.chat-toggle.is-open {
+  background: linear-gradient(135deg, #e74c3c, #c0392b) !important;
+  box-shadow: 0 5px 18px rgba(231, 76, 60, 0.45) !important;
+}
+.chat-toggle.is-open .chat-icon-main {
+  transform: rotate(90deg) scale(0.3);
+  opacity: 0;
+}
+.chat-toggle.is-open .chat-icon-close {
+  transform: rotate(0deg) scale(1);
+  opacity: 1;
 }
 
 /* Chat Options Hidden by Default */
@@ -1377,6 +1412,7 @@
 }
 .chat-btn:hover {
   transform: translateY(-3px);
+  color: white;
 }
 
 /* Button Colors */
@@ -1920,10 +1956,37 @@
 
 
 <script>
-/* ЁЯФ╣ Toggle Open/Close */
-document.getElementById("chatToggle").addEventListener("click", function() {
-  document.getElementById("chatOptions").classList.toggle("show");
-});
+/* 🔻 Toggle Chat & Cross Icon */
+(function() {
+  var toggle = document.getElementById("chatToggle");
+  var options = document.getElementById("chatOptions");
+  var widget = document.getElementById("chatWidget");
+  if (!toggle || !options) return;
+
+  toggle.addEventListener("click", function(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    toggle.classList.toggle("is-open");
+    options.classList.toggle("show");
+  });
+
+  // Close when clicking outside
+  document.addEventListener("click", function(e) {
+    if (widget && !widget.contains(e.target) && toggle.classList.contains("is-open")) {
+      toggle.classList.remove("is-open");
+      options.classList.remove("show");
+    }
+  });
+
+  // Close when an option is clicked
+  options.querySelectorAll(".chat-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      setTimeout(function() {
+        toggle.classList.remove("is-open");
+        options.classList.remove("show");
+      }, 200);
+    });
+  });
+})();
 </script>
 
 
