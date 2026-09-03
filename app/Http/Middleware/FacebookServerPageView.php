@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Support\Facades\Log;
 
 class FacebookServerPageView
 {
@@ -138,7 +139,12 @@ class FacebookServerPageView
                     'event_id'         => $pvEventId, // ⭐ Browser pixel এর same ID → deduplication
                 ]);
             } catch (\Throwable $e) {
-                // non-blocking — silently fail
+                // Non-blocking: log error so issues can be diagnosed
+                Log::error('Facebook CAPI PageView Error: ' . $e->getMessage(), [
+                    'event_id' => $pvEventId,
+                    'file'     => $e->getFile(),
+                    'line'     => $e->getLine(),
+                ]);
             }
         })->afterResponse();
     }

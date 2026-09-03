@@ -41,5 +41,13 @@ class TrackingComposer
 
         // TikTok Pixels
         $view->with('tiktok_pixels', Cache::remember('tiktok_pixels_list', 3600, fn() => TiktokPixel::where('status', 1)->get()));
+
+        // Facebook PageView Event ID - ensure available for deduplication
+        if (!$view->offsetExists('fb_pv_event_id') || empty($view->getData()['fb_pv_event_id'])) {
+            $pvEventId = request()->attributes->get('fb_pv_event_id');
+            if ($pvEventId) {
+                $view->with('fb_pv_event_id', $pvEventId);
+            }
+        }
     }
 }

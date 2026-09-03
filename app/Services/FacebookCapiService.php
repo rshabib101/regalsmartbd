@@ -65,11 +65,12 @@ class FacebookCapiService
             return false;
         }
 
-        // Local development check: prevent blocking single-threaded development server
+        // Local development check: allow if test_event_code is set so developer can test CAPI & deduplication
         $host = request()->getHost();
         $ip = request()->ip();
-        if (app()->environment('local') || $host === '127.0.0.1' || $host === 'localhost' || in_array($ip, ['127.0.0.1', '::1'])) {
-            Log::info('Facebook CAPI: Skipped on localhost/127.0.0.1', ['event_name' => $eventName]);
+        $isLocal = app()->environment('local') || $host === '127.0.0.1' || $host === 'localhost' || in_array($ip, ['127.0.0.1', '::1']);
+        if ($isLocal && empty($this->testEventCode) && !env('FACEBOOK_CAPI_ALLOW_LOCAL', false)) {
+            Log::info('Facebook CAPI: Skipped on localhost/127.0.0.1 (set test_event_code or FACEBOOK_CAPI_ALLOW_LOCAL=true to enable)', ['event_name' => $eventName]);
             return ['success' => true, 'local_skipped' => true];
         }
 

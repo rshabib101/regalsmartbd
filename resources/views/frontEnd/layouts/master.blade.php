@@ -72,7 +72,7 @@
             });
         </script>
 
-        @foreach($pixels as $pixel)
+        @if(!empty($pixels) && count($pixels) > 0)
         <!-- Facebook Pixel Code -->
         <script>
             !(function (f, b, e, v, n, t, s) {
@@ -91,15 +91,21 @@
                 s = b.getElementsByTagName(e)[0];
                 s.parentNode.insertBefore(t, s);
             })(window, document, "script", "https://connect.facebook.net/en_US/fbevents.js");
-            fbq("init", "{{{$pixel->code}}}", @json(!empty($fbUserData) ? $fbUserData : (object)[]));
-            {{-- ⭐ eventID দিয়ে PageView — server CAPI এর সাথে deduplication হবে --}}
-            fbq("track", "PageView", {}, { eventID: "{{ $fb_pv_event_id ?? ('pv_' . uniqid()) }}" });
+
+            @foreach($pixels as $pixel)
+            fbq("init", "{{{ trim($pixel->code) }}}", @json(!empty($fbUserData) ? $fbUserData : (object)[]));
+            @endforeach
+
+            {{-- ⭐ eventID দিয়ে PageView একবারই ফায়ার হবে — server CAPI এর সাথে deduplication হবে --}}
+            fbq("track", "PageView", {}, { eventID: "{{ $fb_pv_event_id ?? request()->attributes->get('fb_pv_event_id', 'pv_' . uniqid()) }}" });
         </script>
+        @foreach($pixels as $pixel)
         <noscript>
-            <img height="1" width="1" style="display: none;" src="https://www.facebook.com/tr?id={{{$pixel->code}}}&ev=PageView&noscript=1" />
+            <img height="1" width="1" style="display: none;" src="https://www.facebook.com/tr?id={{{ trim($pixel->code) }}}&ev=PageView&noscript=1" />
         </noscript>
-        <!-- End Facebook Pixel Code -->
         @endforeach
+        <!-- End Facebook Pixel Code -->
+        @endif
 
         @foreach($tiktok_pixels as $tp)
         <!-- TikTok Pixel -->

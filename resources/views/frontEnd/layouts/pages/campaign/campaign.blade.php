@@ -125,7 +125,7 @@
             @foreach($pixels as $pixel)
             fbq('init', '{{{ $pixel->code }}}');
             @endforeach
-            fbq('track', 'PageView', {}, {eventID: {{ json_encode('pv_camp'.$campaign_data->id.'_'.time()) }}});
+            fbq('track', 'PageView', {}, {eventID: {{ json_encode($fb_pv_event_id ?? request()->attributes->get('fb_pv_event_id', 'pv_camp'.$campaign_data->id.'_'.time())) }}});
             @php
                 $campPayload = [
                     'content_name' => strip_tags($campaign_data->name),
