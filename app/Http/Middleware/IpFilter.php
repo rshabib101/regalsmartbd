@@ -11,12 +11,16 @@ class IpFilter
 {
     public function handle(Request $request, Closure $next)
     {
-        $clientIp = $request->getClientIp();
-        $ipblock = Cache::remember("ip_block_{$clientIp}", 60, function () use ($clientIp) {
-            return IpBlock::where('ip_no', $clientIp)->first();
-        });
-        if ($ipblock) {
-            abort(403, "You are restricted to access the site. Because " . $ipblock->reason);
+        try {
+            $clientIp = $request->getClientIp();
+            $ipblock = Cache::remember("ip_block_{$clientIp}", 60, function () use ($clientIp) {
+                return IpBlock::where('ip_no', $clientIp)->first();
+            });
+            if ($ipblock) {
+                abort(403, "You are restricted to access the site. Because " . $ipblock->reason);
+            }
+        } catch (\Throwable $e) {
+            // If table doesn't exist or DB issue, allow request
         }
         return $next($request);
     }

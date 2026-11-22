@@ -17,13 +17,22 @@ class ResellerCustomDomain
 
         // Skip if this is main app domain (e.g. from APP_URL)
         $appUrl = parse_url(config('app.url', ''), PHP_URL_HOST);
-        if ($appUrl && strtolower($appUrl) === $host) {
-            return $next($request);
+        if ($appUrl) {
+            $cleanApp = preg_replace('/^www\./', '', strtolower($appUrl));
+            $cleanHost = preg_replace('/^www\./', '', $host);
+            if ($cleanApp === $cleanHost) {
+                return $next($request);
+            }
         }
 
-        $landing = ResellerLandingPage::where('custom_domain', $host)
-            ->where('is_active', 1)
-            ->first();
+        try {
+            $landing = ResellerLandingPage::where('custom_domain', $host)
+                ->where('is_active', 1)
+                ->first();
+        } catch (\Throwable $e) {
+            // Table doesn't exist yet or DB issue, proceed normally without crashing
+            return $next($request);
+        }
 
         if (!$landing) {
             return $next($request);

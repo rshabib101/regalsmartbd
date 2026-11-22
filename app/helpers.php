@@ -8,11 +8,15 @@ if (!function_exists('landing_url')) {
      */
     function landing_url(string $slug, string $path = ''): string
     {
-        $landing = ResellerLandingPage::where('slug', $slug)->first();
-        $host = strtolower(request()->getHost());
+        try {
+            $landing = ResellerLandingPage::where('slug', $slug)->first();
+            $host = strtolower(request()->getHost());
 
-        if ($landing && $landing->custom_domain && strtolower($landing->custom_domain) === $host) {
-            return $path === '' ? url('/') : url($path);
+            if ($landing && $landing->custom_domain && strtolower($landing->custom_domain) === $host) {
+                return $path === '' ? url('/') : url($path);
+            }
+        } catch (\Throwable $e) {
+            // Table doesn't exist yet or DB error, fallback
         }
 
         $base = '/r/' . $slug;
