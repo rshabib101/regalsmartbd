@@ -10,21 +10,21 @@
     <link rel="shortcut icon" href="{{asset(isset($generalsetting->favicon) ? $generalsetting->favicon : 'public/backEnd/assets/images/favicon.ico')}}" />
 
     <!-- Bootstrap css -->
-    <link href="{{asset('public/backEnd/')}}/assets/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+    <link href="{{asset('backEnd/assets/css/bootstrap.min.css')}}" rel="stylesheet" type="text/css" />
     <!-- App css -->
-    <link href="{{asset('public/backEnd/')}}/assets/css/app.min.css" rel="stylesheet" type="text/css" />
+    <link href="{{asset('backEnd/assets/css/app.min.css')}}" rel="stylesheet" type="text/css" />
     <!-- icons -->
-    <link href="{{asset('public/backEnd/')}}/assets/css/icons.min.css" rel="stylesheet" type="text/css" />
+    <link href="{{asset('backEnd/assets/css/icons.min.css')}}" rel="stylesheet" type="text/css" />
     <!-- toastr css -->
-    <link rel="stylesheet" href="{{asset('public/backEnd/')}}/assets/css/toastr.min.css" />
+    <link rel="stylesheet" href="{{asset('backEnd/assets/css/toastr.min.css')}}" />
     <!-- SweetAlert2 - ডেমো মুড পপআপের জন্য -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" />
     <!-- custom css -->
-    <link href="{{asset('public/backEnd/')}}/assets/css/custom.css" rel="stylesheet" type="text/css" />
+    <link href="{{asset('backEnd/assets/css/custom.css')}}" rel="stylesheet" type="text/css" />
     <!-- Head js -->
     @yield('css')
     <style>.navbar-custom .dropdown-menu .noti-scroll{max-height:230px!important;overflow-y:auto!important}</style>
-    <script src="{{asset('public/backEnd/')}}/assets/js/head.js"></script>
+    <script src="{{asset('backEnd/assets/js/head.js')}}"></script>
   </head>
 
   <!-- body start -->

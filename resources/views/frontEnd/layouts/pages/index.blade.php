@@ -23,8 +23,8 @@
 @endpush 
 
 @push('css')
-<link rel="stylesheet" href="{{ asset('public/frontEnd/css/owl.carousel.min.css') }}" />
-<link rel="stylesheet" href="{{ asset('public/frontEnd/css/owl.theme.default.min.css') }}" />
+<link rel="stylesheet" href="{{ asset('frontEnd/css/owl.carousel.min.css') }}" />
+<link rel="stylesheet" href="{{ asset('frontEnd/css/owl.theme.default.min.css') }}" />
 <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.5.2/animate.css" rel="stylesheet" />
 @endpush 
 

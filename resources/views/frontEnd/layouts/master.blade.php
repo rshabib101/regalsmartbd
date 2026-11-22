@@ -15,20 +15,20 @@
         <link rel="canonical" href="https://creativedesign.com.bd" />
         @stack('seo') 
         @stack('css')
-        <link rel="stylesheet" href="{{asset('public/frontEnd/css/bootstrap.min.css')}}" />
-        <link rel="stylesheet" href="{{asset('public/frontEnd/css/animate.css')}}" />
-        <link rel="stylesheet" href="{{asset('public/frontEnd/css/all.min.css')}}" />
-        <link rel="stylesheet" href="{{asset('public/frontEnd/css/owl.carousel.min.css')}}" />
-        <link rel="stylesheet" href="{{asset('public/frontEnd/css/owl.theme.default.min.css')}}" />
-        <link rel="stylesheet" href="{{asset('public/frontEnd/css/mobile-menu.css')}}" />
-        <link rel="stylesheet" href="{{asset('public/frontEnd/css/select2.min.css')}}" />
+        <link rel="stylesheet" href="{{asset('frontEnd/css/bootstrap.min.css')}}" />
+        <link rel="stylesheet" href="{{asset('frontEnd/css/animate.css')}}" />
+        <link rel="stylesheet" href="{{asset('frontEnd/css/all.min.css')}}" />
+        <link rel="stylesheet" href="{{asset('frontEnd/css/owl.carousel.min.css')}}" />
+        <link rel="stylesheet" href="{{asset('frontEnd/css/owl.theme.default.min.css')}}" />
+        <link rel="stylesheet" href="{{asset('frontEnd/css/mobile-menu.css')}}" />
+        <link rel="stylesheet" href="{{asset('frontEnd/css/select2.min.css')}}" />
         <!-- toastr css -->
-        <link rel="stylesheet" href="{{asset('public/backEnd/')}}/assets/css/toastr.min.css" />
+        <link rel="stylesheet" href="{{asset('backEnd/assets/css/toastr.min.css')}}" />
 
-        <link rel="stylesheet" href="{{asset('public/frontEnd/css/wsit-menu.css')}}" />
-        <link rel="stylesheet" href="{{ url('/style.css') }}?v={{ file_exists(public_path('style.css')) ? filemtime(public_path('style.css')) : '1.0' }}">
-        <link rel="stylesheet" href="{{ url('/responsive.css') }}?v={{ file_exists(public_path('responsive.css')) ? filemtime(public_path('responsive.css')) : '1.0' }}">
-        <link rel="stylesheet" href="{{asset('public/frontEnd/css/main.css')}}" />
+        <link rel="stylesheet" href="{{asset('frontEnd/css/wsit-menu.css')}}" />
+        <link rel="stylesheet" href="{{asset('style.css')}}?v={{ file_exists(public_path('style.css')) ? filemtime(public_path('style.css')) : '1.0' }}" />
+        <link rel="stylesheet" href="{{asset('responsive.css')}}?v={{ file_exists(public_path('responsive.css')) ? filemtime(public_path('responsive.css')) : '1.0' }}" />
+        <link rel="stylesheet" href="{{asset('frontEnd/css/main.css')}}" />
 
         <meta name="facebook-domain-verification" content="{{$generalsetting->facebook_verification}}" />
         <meta name="google-site-verification" content="{{$generalsetting->google_verification}}" />
@@ -1996,13 +1996,13 @@
         <div id="page-overlay"></div>
         <div id="loading"><div class="custom-loader"></div></div>
 
-        <script src="{{asset('public/frontEnd/js/jquery-3.6.3.min.js')}}"></script>
-        <script src="{{asset('public/frontEnd/js/bootstrap.min.js')}}"></script>
-        <script src="{{asset('public/frontEnd/js/owl.carousel.min.js')}}"></script>
-        <script src="{{asset('public/frontEnd/js/mobile-menu.js')}}"></script>
-        <script src="{{asset('public/frontEnd/js/wsit-menu.js')}}"></script>
-        <script src="{{asset('public/frontEnd/js/mobile-menu-init.js')}}"></script>
-        <script src="{{asset('public/frontEnd/js/wow.min.js')}}"></script>
+        <script src="{{asset('frontEnd/js/jquery-3.6.3.min.js')}}"></script>
+        <script src="{{asset('frontEnd/js/bootstrap.min.js')}}"></script>
+        <script src="{{asset('frontEnd/js/owl.carousel.min.js')}}"></script>
+        <script src="{{asset('frontEnd/js/mobile-menu.js')}}"></script>
+        <script src="{{asset('frontEnd/js/wsit-menu.js')}}"></script>
+        <script src="{{asset('frontEnd/js/mobile-menu-init.js')}}"></script>
+        <script src="{{asset('frontEnd/js/wow.min.js')}}"></script>
         <script>
             new WOW().init();
         </script>
@@ -2014,7 +2014,7 @@
         <script>
             feather.replace();
         </script>
-        <script src="{{asset('public/backEnd/')}}/assets/js/toastr.min.js"></script>
+        <script src="{{asset('backEnd/assets/js/toastr.min.js')}}"></script>
         {!! Toastr::message() !!} @stack('script')
         <script>
             $(document).on("click", ".quick_view, .open-variant-modal", function (e) {

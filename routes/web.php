@@ -157,18 +157,76 @@ Route::post('/api/redx/webhook', [\App\Http\Controllers\Admin\RedXWebhookControl
     ->name('redx.webhook');
 
 	
+// Serve public assets if requested with /public/ prefix (common in shared hosting & local dev)
+Route::get('/public/{any}', function ($any) {
+    $path = public_path($any);
+    if (!file_exists($path) || !is_file($path)) {
+        abort(404);
+    }
+
+    $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+    $mimes = [
+        'css'   => 'text/css; charset=UTF-8',
+        'js'    => 'application/javascript; charset=UTF-8',
+        'mjs'   => 'application/javascript; charset=UTF-8',
+        'json'  => 'application/json',
+        'png'   => 'image/png',
+        'jpg'   => 'image/jpeg',
+        'jpeg'  => 'image/jpeg',
+        'gif'   => 'image/gif',
+        'svg'   => 'image/svg+xml',
+        'webp'  => 'image/webp',
+        'ico'   => 'image/x-icon',
+        'woff'  => 'font/woff',
+        'woff2' => 'font/woff2',
+        'ttf'   => 'font/ttf',
+        'eot'   => 'application/vnd.ms-fontobject',
+        'otf'   => 'font/otf',
+        'map'   => 'application/json',
+    ];
+
+    $headers = [
+        'Content-Type'  => $mimes[$extension] ?? (mime_content_type($path) ?: 'application/octet-stream'),
+        'Cache-Control' => 'public, max-age=86400',
+    ];
+
+    return response()->file($path, $headers);
+})->where('any', '.*');
+
 Route::get('/style.css', function () {
-    $css = view('frontEnd.assets.style')->render();   // Blade থেকে CSS রেন্ডার
+    $filePath = public_path('style.css');
+    if (file_exists($filePath)) {
+        return response()->file($filePath, [
+            'Content-Type'  => 'text/css; charset=UTF-8',
+            'Cache-Control' => 'public, max-age=3600',
+        ]);
+    }
+    try {
+        $css = view('frontEnd.assets.style')->render();
+    } catch (\Throwable $e) {
+        $css = '';
+    }
     return Response::make($css, 200, [
-        'Content-Type'  => 'text/css',
-        'Cache-Control' => 'public, max-age=3600', // ১ ঘন্টা ব্রাউজারে ক্যাশ হবে
+        'Content-Type'  => 'text/css; charset=UTF-8',
+        'Cache-Control' => 'public, max-age=3600',
     ]);
 });
 
 Route::get('/responsive.css', function () {
-    $css = view('frontEnd.assets.responsive')->render();
+    $filePath = public_path('responsive.css');
+    if (file_exists($filePath)) {
+        return response()->file($filePath, [
+            'Content-Type'  => 'text/css; charset=UTF-8',
+            'Cache-Control' => 'public, max-age=3600',
+        ]);
+    }
+    try {
+        $css = view('frontEnd.assets.responsive')->render();
+    } catch (\Throwable $e) {
+        $css = '';
+    }
     return Response::make($css, 200, [
-        'Content-Type'  => 'text/css',
+        'Content-Type'  => 'text/css; charset=UTF-8',
         'Cache-Control' => 'public, max-age=3600',
     ]);
 });
