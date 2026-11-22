@@ -14,22 +14,19 @@
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
 
+    # Serve static assets directly from public/ directory
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(frontEnd|backEnd|uploads|assets|complaints|storage)/(.*)$ public/$1/$2 [L,QSA]
+
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(style\.css|responsive\.css)$ public/$1 [L,QSA]
+
     # Send Requests To Front Controller...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
-RewriteRule ^ index.php [L]
-    
-  RewriteCond %{HTTP_HOST} ^www.gomobd.com [NC]
-  RewriteRule ^(.*)$ https://gomobd.com/$1 [L,R=301]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteRule ^([^\.]+)$ $1.php [NC,L]
-  
-  RewriteCond %{HTTP_HOST} ^gomobd.com [NC]
-  RewriteRule ^(.*)$ https://gomobd.com/$1 [L,R=301]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteRule ^([^\.]+)$ $1.php [NC,L]
-  
-  
+    RewriteRule ^ index.php [L]
 </IfModule>
 
 # BEGIN cPanel-generated php ini directives, do not edit

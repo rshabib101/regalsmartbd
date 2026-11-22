@@ -161,7 +161,12 @@ Route::post('/api/redx/webhook', [\App\Http\Controllers\Admin\RedXWebhookControl
 Route::get('/public/{any}', function ($any) {
     $path = public_path($any);
     if (!file_exists($path) || !is_file($path)) {
-        abort(404);
+        $nested = public_path('public/' . $any);
+        if (file_exists($nested) && is_file($nested)) {
+            $path = $nested;
+        } else {
+            abort(404);
+        }
     }
 
     $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
@@ -192,6 +197,47 @@ Route::get('/public/{any}', function ($any) {
 
     return response()->file($path, $headers);
 })->where('any', '.*');
+
+// Serve assets if requested directly as /frontEnd/..., /backEnd/..., /uploads/..., etc. (cPanel/Hostinger public_html root)
+Route::get('/{folder}/{any}', function ($folder, $any) {
+    $path = public_path($folder . '/' . $any);
+    if (!file_exists($path) || !is_file($path)) {
+        $nested = public_path('public/' . $folder . '/' . $any);
+        if (file_exists($nested) && is_file($nested)) {
+            $path = $nested;
+        } else {
+            abort(404);
+        }
+    }
+
+    $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+    $mimes = [
+        'css'   => 'text/css; charset=UTF-8',
+        'js'    => 'application/javascript; charset=UTF-8',
+        'mjs'   => 'application/javascript; charset=UTF-8',
+        'json'  => 'application/json',
+        'png'   => 'image/png',
+        'jpg'   => 'image/jpeg',
+        'jpeg'  => 'image/jpeg',
+        'gif'   => 'image/gif',
+        'svg'   => 'image/svg+xml',
+        'webp'  => 'image/webp',
+        'ico'   => 'image/x-icon',
+        'woff'  => 'font/woff',
+        'woff2' => 'font/woff2',
+        'ttf'   => 'font/ttf',
+        'eot'   => 'application/vnd.ms-fontobject',
+        'otf'   => 'font/otf',
+        'map'   => 'application/json',
+    ];
+
+    $headers = [
+        'Content-Type'  => $mimes[$extension] ?? (mime_content_type($path) ?: 'application/octet-stream'),
+        'Cache-Control' => 'public, max-age=86400',
+    ];
+
+    return response()->file($path, $headers);
+})->where('folder', 'frontEnd|backEnd|uploads|assets|complaints|storage')->where('any', '.*');
 
 Route::get('/style.css', function () {
     $filePath = public_path('style.css');
